@@ -1,0 +1,178 @@
+rules:
+  - id: fear_greed_extreme_fear
+    name: "Extreme Fear"
+    metric: FEAR_GREED
+    operator: "<"
+    threshold: 20
+    severity: WARNING
+    cooldown_seconds: 3600
+    enabled: true
+    description: "Fear & Greed Index below 20 - extreme fear, potential contrarian buy"
+
+  - id: fear_greed_extreme_greed
+    name: "Extreme Greed"
+    metric: FEAR_GREED
+    operator: ">"
+    threshold: 80
+    severity: WARNING
+    cooldown_seconds: 3600
+    enabled: true
+    description: "Fear & Greed Index above 80 - extreme greed, potential distribution"
+
+  - id: mvrv_undervalued
+    name: "MVRV Undervalued"
+    metric: MVRV
+    operator: "<"
+    threshold: 1.0
+    severity: WARNING
+    cooldown_seconds: 7200
+    enabled: true
+    description: "MVRV below 1.0 - market value below realized value, historically undervalued"
+
+  - id: mvrv_deep_undervalued
+    name: "MVRV Deep Undervalued"
+    metric: MVRV
+    operator: "<"
+    threshold: 0.5
+    severity: CRITICAL
+    cooldown_seconds: 14400
+    enabled: true
+    description: "MVRV below 0.5 - extreme undervaluation, historically rare bottom signal"
+
+  - id: mvrv_overvalued
+    name: "MVRV Overvalued"
+    metric: MVRV
+    operator: ">"
+    threshold: 3.5
+    severity: WARNING
+    cooldown_seconds: 7200
+    enabled: true
+    description: "MVRV above 3.5 - historically overvalued zone"
+
+  - id: hash_rate_decline
+    name: "Hash Rate Declining"
+    metric: HASH_RATE_CHANGE_30D
+    operator: "<"
+    threshold: -15
+    severity: WARNING
+    cooldown_seconds: 86400
+    enabled: true
+    description: "Hash rate down >15% in 30 days - miner stress/capitulation"
+
+  - id: drawdown_deep
+    name: "Deep Drawdown"
+    metric: DRAWDOWN_FROM_ATH
+    operator: ">"
+    threshold: 50
+    severity: WARNING
+    cooldown_seconds: 86400
+    enabled: true
+    description: "50%+ drawdown from ATH - historically strong entry zone per Nadeau"
+
+  - id: drawdown_extreme
+    name: "Extreme Drawdown"
+    metric: DRAWDOWN_FROM_ATH
+    operator: ">"
+    threshold: 70
+    severity: CRITICAL
+    cooldown_seconds: 86400
+    enabled: true
+    description: "70%+ drawdown from ATH - deep bear territory"
+
+  - id: btc_gold_declining
+    name: "BTC/Gold Ratio Declining"
+    metric: BTC_GOLD_CHANGE_30D
+    operator: "<"
+    threshold: -20
+    severity: INFO
+    cooldown_seconds: 86400
+    enabled: true
+    description: "BTC underperforming gold significantly - bearish per Nadeau"
+
+  - id: dominance_low
+    name: "BTC Dominance Low"
+    metric: DOMINANCE
+    operator: "<"
+    threshold: 40
+    severity: INFO
+    cooldown_seconds: 86400
+    enabled: true
+    description: "BTC dominance below 40% - alt season risk"
+
+  - id: dominance_high
+    name: "BTC Dominance High"
+    metric: DOMINANCE
+    operator: ">"
+    threshold: 65
+    severity: INFO
+    cooldown_seconds: 86400
+    enabled: true
+    description: "BTC dominance above 65% - flight to quality"
+
+  - id: price_drop_7d
+    name: "Price Drop 7d"
+    metric: PRICE_CHANGE_7D
+    operator: "<"
+    threshold: -15
+    severity: WARNING
+    cooldown_seconds: 86400
+    enabled: true
+    description: "Price dropped >15% in 7 days"
+
+  - id: price_drop_30d
+    name: "Price Drop 30d"
+    metric: PRICE_CHANGE_30D
+    operator: "<"
+    threshold: -30
+    severity: WARNING
+    cooldown_seconds: 86400
+    enabled: true
+    description: "Price dropped >30% in 30 days"
+
+composites:
+  - id: capitulation_zone
+    name: "Capitulation Zone"
+    description: "Multiple bearish extremes converging - Nadeau capitulation signal"
+    required_rules:
+      - mvrv_undervalued
+      - fear_greed_extreme_fear
+      - drawdown_deep
+    severity: CRITICAL
+    cooldown_seconds: 86400
+
+  - id: accumulation_signal
+    name: "Accumulation Signal"
+    description: "Conditions aligning for smart money accumulation per Nadeau"
+    required_rules:
+      - mvrv_undervalued
+      - fear_greed_extreme_fear
+    severity: WARNING
+    cooldown_seconds: 43200
+
+  - id: cycle_bottom
+    name: "Potential Cycle Bottom"
+    description: "Extreme convergence of bottom signals - historically rare"
+    required_rules:
+      - mvrv_deep_undervalued
+      - fear_greed_extreme_fear
+      - drawdown_extreme
+    severity: CRITICAL
+    cooldown_seconds: 86400
+
+  - id: overheated
+    name: "Market Overheated"
+    description: "Multiple top signals converging - distribution risk"
+    required_rules:
+      - mvrv_overvalued
+      - fear_greed_extreme_greed
+    severity: WARNING
+    cooldown_seconds: 43200
+
+  - id: distribution_warning
+    name: "Distribution Warning"
+    description: "Early signs of distribution phase per Nadeau framework"
+    required_rules:
+      - mvrv_overvalued
+      - fear_greed_extreme_greed
+    severity: INFO
+    cooldown_seconds: 86400

@@ -1,0 +1,55 @@
+api:
+  coingecko:
+    rate_limit: 30  # calls per minute
+    cache_ttl: 300  # seconds
+  blockchain_info:
+    rate_limit: 30
+    cache_ttl: 300
+  mempool:
+    rate_limit: 60
+    cache_ttl: 120
+  fear_greed:
+    rate_limit: 30
+    cache_ttl: 600
+  coinmetrics:
+    rate_limit: 100
+    cache_ttl: 600
+
+monitor:
+  fetch_interval: 900  # 15 minutes
+  backfill_start_year: 2015
+
+dca:
+  default_amount: 100
+  default_frequency: weekly  # daily, weekly, biweekly, monthly
+
+alerts:
+  cooldown: 3600  # 1 hour between repeated alerts
+  desktop_notifications: true
+  sound_on_critical: false
+  max_desktop_per_5min: 1
+
+dashboard:
+  refresh_interval: 60  # seconds
+  compact_threshold: 120  # terminal width below which compact mode activates
+
+database:
+  path: data/bitcoin.db
+
+smart_alerts:
+  enabled: true
+  dca_reminders: true
+  dip_alerts: true
+  milestone_alerts: true
+  weekly_summary: true
+  streak_alerts: true
+
+plain_english: true
+couples_mode: false
+default_monthly_dca: 200
+
+reference_levels:
+  support: [60000, 65000, 70000, 75000, 80000]
+  resistance: [85000, 95000, 100000, 110000, 126000]
+  cost_bases:
+    MicroStrategy: 76000
