@@ -4,7 +4,7 @@
 
 > 128 tests | 28 CLI commands | 5 free APIs | 9 chart types | 50+ source files
 
-Built on Michael Nadeau's (The DeFi Report) cycle analysis framework. Tracks MVRV, Fear & Greed, hash rate, halving cycles, and drawdowns — all from free APIs. Includes a DCA simulator, goal tracker, alert system, terminal dashboard, and a couple-friendly plain English mode for planning together.
+Built on Michael Nadeau's (The DeFi Report) cycle analysis framework. Tracks MVRV, Fear & Greed, network HR, halving cycles, and drawdowns — all from free APIs. Includes a DCA simulator, goal tracker, alert system, terminal dashboard, and a couple-friendly plain English mode for planning together.
 
 **Who it's for:** Anyone DCA'ing into Bitcoin who wants to understand where we are in the cycle, what the data says, and how their accumulation strategy is tracking — without paying for expensive analytics platforms.
 
@@ -86,7 +86,7 @@ graph TD
     Monitor --> DB["Database<br/>models/database.py<br/>SQLite + WAL"]
 
     API --> CG["CoinGecko<br/>Price, Market Cap,<br/>Volume, Supply"]
-    API --> BC["Blockchain.com<br/>Hash Rate,<br/>Difficulty"]
+    API --> BC["Blockchain.com<br/>Network HR,<br/>Difficulty"]
     API --> MP["mempool.space<br/>Difficulty<br/>Adjustment"]
     API --> FG["alternative.me<br/>Fear & Greed<br/>Index"]
     API --> CM["CoinMetrics<br/>MVRV Ratio"]
@@ -260,7 +260,7 @@ Design decisions:
 | Client | Source | Data | Rate Limit | Cache TTL |
 |--------|--------|------|------------|-----------|
 | `CoinGeckoClient` | api.coingecko.com | Price, market cap, volume, dominance, BTC/Gold, supply, historical | 30/min | 5 min |
-| `BlockchainInfoClient` | api.blockchain.info | Hash rate, difficulty, 30-day trends | 30/min | 5 min |
+| `BlockchainInfoClient` | api.blockchain.info | Network HR, difficulty, 30-day trends | 30/min | 5 min |
 | `MempoolClient` | mempool.space | Difficulty adjustment, hashrate history | 60/min | 2 min |
 | `FearGreedClient` | api.alternative.me | Fear & Greed index (current + history) | 30/min | 10 min |
 | `CoinMetricsClient` | community-api.coinmetrics.io | MVRV ratio (with local estimation fallback) | 100/min | 10 min |
@@ -411,7 +411,7 @@ Based on Michael Nadeau's (The DeFi Report) Bitcoin cycle analysis methodology, 
 |--------|--------|---------|---------|--------|
 | **MVRV Ratio** | Market Value / Realized Value | < 1.0 (undervalued) | > 3.5 (overvalued) | CoinMetrics |
 | **Fear & Greed** | Sentiment index (0-100) | < 20 (extreme fear = contrarian buy) | > 80 (extreme greed = caution) | alternative.me |
-| **Hash Rate Trend** | 30-day difficulty change | Growing (miners investing) | Declining >15% (miner stress) | Blockchain.com |
+| **Network HR Trend** | 30-day difficulty change | Growing (miners investing) | Declining >15% (miner stress) | Blockchain.com |
 | **ATH Drawdown** | Current price vs all-time high | > 50% (historically strong entry) | < 5% (near ATH, caution) | CoinGecko |
 | **BTC/Gold Ratio** | BTC price in gold ounces | Rising (relative strength) | Declining >20% (risk-off) | CoinGecko |
 | **Supply Dynamics** | Estimated % of supply in profit | Low (capitulation exhaustion) | Very high (distribution risk) | Price history |
@@ -442,7 +442,7 @@ The plain English layer converts signals into a simple GREEN / YELLOW / RED indi
 stateDiagram-v2
     [*] --> ACCUMULATION: Post-crash bottom
     ACCUMULATION --> EARLY_BULL: MVRV rising > 1.0
-    EARLY_BULL --> MID_BULL: Price momentum + growing hash rate
+    EARLY_BULL --> MID_BULL: Price momentum + growing network HR
     MID_BULL --> LATE_BULL: MVRV > 2.5, greed rising
     LATE_BULL --> DISTRIBUTION: MVRV > 3.5, extreme greed
     DISTRIBUTION --> EARLY_BEAR: Price declining from ATH
@@ -642,7 +642,7 @@ What happens when you ask for a couple-friendly summary:
 2. cycle.get_nadeau_signals(snapshot)
    ├─ Signal 1: MVRV 1.38 → NEUTRAL (fair value range)
    ├─ Signal 2: F&G 7 → BULLISH (extreme fear = contrarian buy signal)
-   ├─ Signal 3: Hash Rate +10% → BULLISH (miners investing)
+   ├─ Signal 3: Network HR +10% → BULLISH (miners investing)
    ├─ Signal 4: Drawdown 43% → BULLISH (deep discount from ATH)
    ├─ Signal 5: BTC/Gold trending → evaluated
    ├─ Signal 6: Supply dynamics → evaluated
@@ -739,7 +739,7 @@ Bitcoin/
 │   └── api/
 │       ├── __init__.py              # APIRegistry (concurrent fetch)
 │       ├── coingecko.py             # Price, market, historical
-│       ├── blockchain_info.py       # Hash rate, difficulty
+│       ├── blockchain_info.py       # Network HR, difficulty
 │       ├── mempool.py               # Difficulty adjustment
 │       ├── fear_greed.py            # Sentiment index
 │       └── coinmetrics.py           # MVRV (+ local estimation fallback)
@@ -771,7 +771,7 @@ Bitcoin/
 │       ├── __init__.py
 │       ├── header.py                # Title bar, timestamp, phase
 │       ├── price.py                 # Price, market cap, changes, sparkline
-│       ├── metrics.py               # Hash rate, difficulty, supply
+│       ├── metrics.py               # Network HR, difficulty, supply
 │       ├── cycle.py                 # Halving info, phase, progress bar
 │       ├── sparklines.py            # 30-day metric trends
 │       ├── alerts_panel.py          # Alert status, recent alerts
@@ -964,7 +964,7 @@ Concrete improvement ideas for future sessions, organized by priority and effort
 | Source | URL | Data Provided |
 |--------|-----|---------------|
 | CoinGecko | api.coingecko.com/api/v3 | Price, market cap, volume, supply, dominance, BTC/Gold, 365-day history |
-| Blockchain.com | api.blockchain.info | Hash rate, mining difficulty, network stats |
+| Blockchain.com | api.blockchain.info | Network HR, mining difficulty, network stats |
 | mempool.space | mempool.space/api | Difficulty adjustment, mining pool data |
 | alternative.me | api.alternative.me | Fear & Greed Index (current + historical) |
 | CoinMetrics | community-api.coinmetrics.io | MVRV ratio (community tier) |

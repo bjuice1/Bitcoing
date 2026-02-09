@@ -51,7 +51,7 @@
   - models/database.py — Full CRUD: snapshots, price_history, alerts, DCA portfolios
 - **Phase 3 (Points 56-95)**: All 5 API clients + APIRegistry
   - monitor/api/coingecko.py — Price, gold ratio, global data, historical prices
-  - monitor/api/blockchain_info.py — Hash rate, difficulty, change calculation
+  - monitor/api/blockchain_info.py — Network HR, difficulty, change calculation
   - monitor/api/mempool.py — Difficulty adjustment, hashrate history
   - monitor/api/fear_greed.py — Current value + history
   - monitor/api/coinmetrics.py — MVRV with progressive fallback + local estimation
@@ -214,7 +214,7 @@ Bitcoin/
   - 8 translation functions: explain_fear_greed, explain_mvrv, explain_drawdown, explain_hash_rate, explain_cycle_phase, explain_dominance, get_traffic_light, explain_overall_signal
   - Traffic light system: GREEN (favorable), YELLOW (mixed), RED (overheated)
   - Couple framing wrapper for `--for-two` mode
-  - 8 educational topics (halving, DCA, MVRV, F&G, hash rate, cycles, sats, market timing)
+  - 8 educational topics (halving, DCA, MVRV, F&G, network HR, cycles, sats, market timing)
 - **Phase 2: Goal Tracker** — `dca/goals.py`
   - GoalTracker class: create_goal, get_progress, get_milestone_status, get_celebration_messages, project_completion
   - BTC milestones (0.001 to 1.0 BTC) + percentage milestones (10-100%)
