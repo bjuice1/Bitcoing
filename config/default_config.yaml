@@ -48,6 +48,15 @@ plain_english: true
 couples_mode: false
 default_monthly_dca: 200
 
+telegram:
+  enabled: false
+  bot_token: ""        # Get from @BotFather on Telegram
+  chat_id: ""          # Get from @userinfobot on Telegram
+  weekly_digest: true
+  action_alerts: true
+  critical_alerts: true
+  min_alert_severity: "WARNING"
+
 reference_levels:
   support: [60000, 65000, 70000, 75000, 80000]
   resistance: [85000, 95000, 100000, 110000, 126000]

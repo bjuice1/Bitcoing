@@ -276,3 +276,67 @@ python main.py report --couples          # Now includes embedded charts
 - `data/price_levels.png` — Price with key support/resistance levels
 
 ---
+
+## 2026-02-08 — Session 3: Action Engine, Telegram Bot, Onboarding Wizard
+
+### What was done
+- **Feature 1: "What Should I Do?" Action Engine** — `utils/action_engine.py`
+  - ActionRecommendation dataclass (action, emoji, headline, detail, confidence, plain_english)
+  - ActionEngine class with decision matrix: STACK_HARD / BUY / HOLD / REDUCE / TAKE_PROFIT
+  - Three formatters: format_terminal (Rich), format_plain (text), format_markdown (Telegram)
+  - Decision based on traffic light + Nadeau bias + fear/greed + drawdown + MVRV
+  - CLI: `python main.py action` with `--json` and `--plain` options
+
+- **Feature 2: Telegram Bot** — `notifications/telegram_bot.py` + `alerts/telegram_channel.py`
+  - TelegramBot: send_message, verify_token, send_weekly_digest, send_action
+  - Uses raw HTTP POST via requests — no extra dependency
+  - TelegramChannel: implements AlertChannel protocol with severity filtering
+  - Config section in default_config.yaml (enabled, bot_token, chat_id, etc.)
+  - CLI group: `python main.py telegram setup/test/send-digest/send-action`
+  - Scheduler: added on_weekly() callback for Sunday digest sends
+  - Interactive setup wizard saves to config/user_config.yaml
+
+- **Feature 3: Onboarding Wizard** — `config/onboarding.py`
+  - OnboardingWizard: 7 Rich interactive prompts
+  - Experience presets (beginner/intermediate/advanced)
+  - Risk tuning (conservative/moderate/aggressive)
+  - Auto-configures: goal, portfolio, DCA amount, notification prefs, couples mode
+  - Saves to config/user_config.yaml, auto-merged by config loader
+  - CLI: `python main.py onboard`
+
+- **Tests**: 37 new tests → 165 total passing
+  - test_action.py: 13 tests (decision matrix, formatters, JSON, CLI)
+  - test_telegram.py: 10 tests (HTTP mocks, digest format, channel filtering, CLI)
+  - test_onboarding.py: 14 tests (presets, risk tuning, config gen, goal/portfolio creation, CLI)
+
+### New commands
+```bash
+python main.py action                    # What should I do? ONE clear action
+python main.py action --json             # Machine-readable JSON output
+python main.py action --plain            # Plain text (no formatting)
+python main.py onboard                   # Interactive first-time setup wizard
+python main.py telegram setup            # Connect Telegram bot
+python main.py telegram test             # Send test message
+python main.py telegram send-digest      # Send weekly digest via Telegram
+python main.py telegram send-action      # Send action recommendation via Telegram
+```
+
+### New files
+```
+notifications/
+├── __init__.py
+└── telegram_bot.py              # Telegram Bot API client
+alerts/telegram_channel.py       # AlertChannel for Telegram
+utils/action_engine.py           # Action recommendation engine
+config/onboarding.py             # Interactive setup wizard
+tests/test_action.py             # 13 tests
+tests/test_telegram.py           # 10 tests
+tests/test_onboarding.py         # 14 tests
+```
+
+### Current state
+- 165 tests passing, 0 failures
+- 31 CLI commands (28 + action + onboard + telegram group)
+- Git initialized, first commit at 318ba6e
+
+---

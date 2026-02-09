@@ -55,10 +55,24 @@ def _init_components(config_path=None, verbose=False):
     from dca.goals import GoalTracker
     goal_tracker = GoalTracker(db)
 
+    # Telegram (optional)
+    telegram_bot = None
+    tg_config = config.get("telegram", {})
+    if tg_config.get("enabled") and tg_config.get("bot_token"):
+        from notifications.telegram_bot import TelegramBot
+        from alerts.telegram_channel import TelegramChannel
+        telegram_bot = TelegramBot(tg_config["bot_token"], tg_config["chat_id"])
+        if tg_config.get("critical_alerts", True):
+            channels.append(TelegramChannel(
+                telegram_bot,
+                min_severity=tg_config.get("min_alert_severity", "WARNING"),
+            ))
+
     return {
         "config": config, "db": db, "api": api, "monitor": monitor,
         "cycle": cycle, "alert_engine": alert_engine, "nadeau": nadeau,
         "dca_tracker": dca_tracker, "rules": rules, "goal_tracker": goal_tracker,
+        "telegram_bot": telegram_bot,
     }
 
 
@@ -109,6 +123,42 @@ def setup(ctx):
         console.print(f"[red]✗[/red] Fetch failed: {e}")
 
     console.print("\n[bold]Setup complete![/bold] Run [bold]python main.py dashboard[/bold] to start monitoring.")
+    console.print("First time? Try [bold]python main.py onboard[/bold] for guided setup.\n")
+
+
+# ──────────────────────────────────────────────────────
+# ONBOARD
+# ──────────────────────────────────────────────────────
+@cli.command()
+@click.pass_context
+def onboard(ctx):
+    """Interactive first-time setup wizard. Configures everything step by step."""
+    c = _get_components(ctx)
+    from config.onboarding import OnboardingWizard
+
+    wizard = OnboardingWizard(
+        db=c["db"],
+        monitor=c["monitor"],
+        goal_tracker=c["goal_tracker"],
+        portfolio_tracker=c["dca_tracker"],
+        config=c["config"],
+    )
+    user_config = wizard.run()
+
+    # If Telegram was requested, prompt for setup
+    if user_config.get("telegram", {}).get("enabled"):
+        console.print("\n[bold]Let's set up Telegram...[/bold]")
+        ctx.invoke(telegram_setup)
+
+    # Show first action recommendation
+    from utils.action_engine import ActionEngine
+    snapshot = c["monitor"].get_current_status()
+    if snapshot:
+        signals = c["cycle"].get_nadeau_signals(snapshot)
+        engine = ActionEngine(c["cycle"], c["monitor"], c["goal_tracker"])
+        rec = engine.get_action(snapshot, signals)
+        console.print("\n[bold #F7931A]Your First Action Recommendation[/bold #F7931A]")
+        console.print(engine.format_terminal(rec))
 
 
 # ──────────────────────────────────────────────────────
@@ -677,6 +727,43 @@ def simple(ctx, for_two, monthly):
 
 
 # ──────────────────────────────────────────────────────
+# ACTION (What Should I Do?)
+# ──────────────────────────────────────────────────────
+@cli.command()
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.option("--plain", is_flag=True, help="Plain text (no Rich formatting)")
+@click.pass_context
+def action(ctx, as_json, plain):
+    """What should I do? ONE clear action based on all signals."""
+    c = _get_components(ctx)
+    from utils.action_engine import ActionEngine
+    import json as jsonlib
+
+    snapshot = c["monitor"].get_current_status()
+    if not snapshot:
+        console.print("[dim]No data yet. Run: python main.py setup[/dim]")
+        return
+
+    signals = c["cycle"].get_nadeau_signals(snapshot)
+    price = snapshot.price.price_usd
+    goal_progress = None
+    try:
+        goal_progress = c["goal_tracker"].get_progress(price)
+    except Exception:
+        pass
+
+    engine = ActionEngine(c["cycle"], c["monitor"], c["goal_tracker"])
+    rec = engine.get_action(snapshot, signals, goal_progress)
+
+    if as_json:
+        console.print(jsonlib.dumps(rec.to_dict(), indent=2, default=str))
+    elif plain:
+        console.print(engine.format_plain(rec))
+    else:
+        console.print(engine.format_terminal(rec))
+
+
+# ──────────────────────────────────────────────────────
 # GOAL
 # ──────────────────────────────────────────────────────
 @cli.group()
@@ -912,6 +999,137 @@ def charts(ctx, fan, cycles, goal_chart, levels, open_files, monthly):
             import subprocess
             for p in generated:
                 subprocess.Popen(["open", p])
+
+
+# ──────────────────────────────────────────────────────
+# TELEGRAM
+# ──────────────────────────────────────────────────────
+@cli.group()
+def telegram():
+    """Telegram bot setup and notifications."""
+    pass
+
+
+@telegram.command("setup")
+@click.pass_context
+def telegram_setup(ctx):
+    """Interactive Telegram bot setup wizard."""
+    from rich.prompt import Prompt, Confirm
+    import yaml
+    from pathlib import Path
+
+    console.print("\n[bold #F7931A]Telegram Bot Setup[/bold #F7931A]\n")
+    console.print("1. Open Telegram, search for [bold]@BotFather[/bold]")
+    console.print("2. Send [bold]/newbot[/bold] and follow the prompts")
+    console.print("3. Copy the bot token below\n")
+
+    token = Prompt.ask("Bot token")
+    if not token:
+        console.print("[red]No token provided.[/red]")
+        return
+
+    # Verify token
+    from notifications.telegram_bot import TelegramBot
+    try:
+        bot = TelegramBot(token, "0")
+        info = bot.verify_token()
+        bot_name = info.get("result", {}).get("username", "unknown")
+        console.print(f"[green]✓[/green] Verified: @{bot_name}\n")
+    except Exception as e:
+        console.print(f"[red]Token verification failed: {e}[/red]")
+        return
+
+    console.print("Now get your chat ID:")
+    console.print("1. Open Telegram, search for [bold]@userinfobot[/bold]")
+    console.print("2. Send [bold]/start[/bold] — it will reply with your ID\n")
+
+    chat_id = Prompt.ask("Chat ID")
+    if not chat_id:
+        console.print("[red]No chat ID provided.[/red]")
+        return
+
+    # Test send
+    bot = TelegramBot(token, chat_id)
+    try:
+        bot.send_message("\u2705 Bitcoin Cycle Monitor connected! You'll receive weekly digests and alerts here.")
+        console.print("[green]✓[/green] Test message sent!\n")
+    except Exception as e:
+        console.print(f"[red]Send failed: {e}[/red]")
+        return
+
+    # Save to user_config.yaml
+    user_config_path = Path("config/user_config.yaml")
+    user_config = {}
+    if user_config_path.exists():
+        with open(user_config_path) as f:
+            user_config = yaml.safe_load(f) or {}
+    user_config["telegram"] = {
+        "enabled": True,
+        "bot_token": token,
+        "chat_id": chat_id,
+        "weekly_digest": True,
+        "action_alerts": True,
+        "critical_alerts": True,
+        "min_alert_severity": "WARNING",
+    }
+    with open(user_config_path, "w") as f:
+        yaml.dump(user_config, f, default_flow_style=False, sort_keys=False)
+
+    console.print(f"[green]✓[/green] Config saved to {user_config_path}")
+    console.print("[dim]Restart commands to pick up Telegram integration.[/dim]")
+
+
+@telegram.command("test")
+@click.pass_context
+def telegram_test(ctx):
+    """Send a test message to verify Telegram setup."""
+    c = _get_components(ctx)
+    bot = c.get("telegram_bot")
+    if not bot:
+        console.print("[red]Telegram not configured. Run: python main.py telegram setup[/red]")
+        return
+    try:
+        bot.send_message("\u2705 Bitcoin Cycle Monitor test — Telegram is working!")
+        console.print("[green]Test message sent![/green]")
+    except Exception as e:
+        console.print(f"[red]Failed: {e}[/red]")
+
+
+@telegram.command("send-digest")
+@click.pass_context
+def telegram_send_digest(ctx):
+    """Send the weekly digest via Telegram now."""
+    c = _get_components(ctx)
+    bot = c.get("telegram_bot")
+    if not bot:
+        console.print("[red]Telegram not configured. Run: python main.py telegram setup[/red]")
+        return
+    from digest.weekly_digest import WeeklyDigest
+    wd = WeeklyDigest(c["monitor"], c["cycle"], c["alert_engine"], c["nadeau"], c["db"])
+    digest_data = wd.generate()
+    bot.send_weekly_digest(digest_data)
+    console.print("[green]Digest sent via Telegram![/green]")
+
+
+@telegram.command("send-action")
+@click.pass_context
+def telegram_send_action(ctx):
+    """Send the action recommendation via Telegram now."""
+    c = _get_components(ctx)
+    bot = c.get("telegram_bot")
+    if not bot:
+        console.print("[red]Telegram not configured. Run: python main.py telegram setup[/red]")
+        return
+    from utils.action_engine import ActionEngine
+    snapshot = c["monitor"].get_current_status()
+    if not snapshot:
+        console.print("[dim]No data. Run: python main.py setup[/dim]")
+        return
+    signals = c["cycle"].get_nadeau_signals(snapshot)
+    engine = ActionEngine(c["cycle"], c["monitor"], c["goal_tracker"])
+    rec = engine.get_action(snapshot, signals)
+    bot.send_action(rec)
+    console.print("[green]Action sent via Telegram![/green]")
 
 
 if __name__ == "__main__":

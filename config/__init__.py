@@ -14,6 +14,14 @@ def load_config(path=None):
     with open(_DEFAULT_CONFIG) as f:
         config = yaml.safe_load(f)
 
+    # Auto-merge user_config.yaml if it exists (from onboarding wizard)
+    _user_config = Path(__file__).parent / "user_config.yaml"
+    if _user_config.exists():
+        with open(_user_config) as f:
+            user_overrides = yaml.safe_load(f) or {}
+        config = _deep_merge(config, user_overrides)
+
+    # Explicit path override takes highest priority
     if path and Path(path).exists():
         with open(path) as f:
             overrides = yaml.safe_load(f) or {}
