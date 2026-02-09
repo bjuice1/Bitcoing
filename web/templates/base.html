@@ -20,6 +20,7 @@
             <nav>
                 <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">Dashboard</a>
                 <a href="/partner" class="nav-link {% if request.path == '/partner' %}active{% endif %}">Partner</a>
+                <a href="/about" class="nav-link {% if request.path == '/about' %}active{% endif %}">How It Works</a>
             </nav>
         </div>
     </header>
@@ -37,9 +38,9 @@
     </footer>
 
     <script>
-        async function loadChart(type, divId) {
+        async function loadChart(type, divId, queryParams = '') {
             try {
-                const resp = await fetch('/api/chart/' + type);
+                const resp = await fetch('/api/chart/' + type + queryParams);
                 if (!resp.ok) return;
                 const fig = await resp.json();
                 if (fig.error) return;

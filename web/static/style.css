@@ -37,8 +37,31 @@ body {
     display: inline-block; padding: 2px 10px; border-radius: 12px;
     font-size: 12px; font-weight: 600; background: var(--grid); color: var(--text-dim);
 }
-.nav-link { margin-left: 16px; text-decoration: none; color: var(--text-dim); font-size: 14px; }
-.nav-link.active { color: var(--orange); font-weight: 600; }
+
+/* Navigation */
+nav {
+    display: flex;
+    gap: 1rem;
+}
+.nav-link {
+    text-decoration: none;
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+.nav-link:hover {
+    background: var(--grid);
+    color: var(--text);
+}
+.nav-link.active {
+    color: var(--orange);
+    font-weight: 600;
+    background: rgba(247, 147, 26, 0.1);
+}
+
 .data-age { font-size: 12px; color: var(--text-dim); }
 
 /* Container */
@@ -68,8 +91,40 @@ body {
 .card-action { border-left: 4px solid var(--orange); }
 
 /* Chart containers */
-.chart-container { width: 100%; min-height: 350px; }
+.chart-container { width: 100%; min-height: 350px; position: relative; }
 .chart-error { color: var(--text-dim); font-size: 14px; text-align: center; padding: 40px; }
+
+/* Chart hover tips */
+.chart-container::before {
+    content: "💡 Tip: Use buttons above to zoom timeframes";
+    position: absolute;
+    top: -30px;
+    right: 10px;
+    font-size: 0.85rem;
+    color: #666;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 10;
+}
+.chart-container:hover::before {
+    opacity: 1;
+}
+
+/* Help icons */
+.help-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #2196F3;
+    color: white;
+    text-align: center;
+    line-height: 20px;
+    font-size: 14px;
+    cursor: help;
+    margin-left: 8px;
+    font-weight: normal;
+}
 
 /* Price display */
 .price-display { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -184,6 +239,229 @@ body {
 
 .fun-fact { background: #F3E5F5; border-left: 4px solid #9C27B0; }
 .fun-fact h3 { color: #7B1FA2; }
+
+/* ─── Settings Control Panel ───────────────────── */
+.settings-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    margin-bottom: 2rem;
+    grid-column: 1 / -1;
+}
+
+.card-header {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+}
+
+.card-header h3 {
+    color: white;
+    margin: 0;
+}
+
+.expand-icon {
+    font-size: 16px;
+    font-weight: bold;
+    transition: transform 0.3s;
+}
+
+.settings-body {
+    padding: 1.5rem;
+    background: rgba(255,255,255,0.95);
+    color: #333;
+    border-radius: 0 0 12px 12px;
+    margin: 1rem -20px -20px -20px;
+}
+
+.control-row {
+    margin-bottom: 1.5rem;
+}
+
+.control-row label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.control-row input[type="range"] {
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: var(--grid);
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.control-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--orange);
+    cursor: pointer;
+}
+
+.control-row input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--orange);
+    cursor: pointer;
+    border: none;
+}
+
+.btn-primary, .btn-secondary {
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    margin-right: 0.5rem;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: var(--orange);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #d67a0a;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: #e0e0e0;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background: #d0d0d0;
+}
+
+/* ─── DCA Simulator ─────────────────────────────── */
+.simulator-card {
+    background: white;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    grid-column: 1 / -1;
+}
+
+.simulator-card .card-subtitle {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 1rem;
+}
+
+.preset-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin: 1rem 0;
+}
+
+.preset-btn {
+    padding: 0.5rem 1rem;
+    background: #e0f2fe;
+    border: 2px solid #0ea5e9;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #0369a1;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.preset-btn:hover {
+    background: #0ea5e9;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.custom-controls {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.custom-controls h4 {
+    font-size: 16px;
+    margin-bottom: 1rem;
+    color: var(--text);
+}
+
+.input-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.input-row label {
+    flex: 1;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+}
+
+.input-row input, .input-row select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-top: 0.25rem;
+    font-size: 14px;
+}
+
+.input-row input:focus, .input-row select:focus {
+    outline: none;
+    border-color: var(--orange);
+}
+
+.sim-results {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 2px solid var(--orange);
+}
+
+.sim-results h4 {
+    font-size: 18px;
+    margin-bottom: 1rem;
+    color: var(--text);
+}
+
+.result-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 2rem 0;
+}
+
+.result-item {
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.result-label {
+    display: block;
+    font-size: 0.875rem;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.result-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0f172a;
+}
 
 /* Progress bar */
 .progress-bar-container {

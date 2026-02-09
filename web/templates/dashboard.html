@@ -51,25 +51,100 @@
         <div class="metric-subtitle">ATH: ${{ ath_price | format_usd }}</div>
     </section>
 
+    <!-- Settings Control Panel -->
+    <section class="card settings-card">
+        <div class="card-header" onclick="toggleSettings()">
+            <h3>⚙️ Chart Settings</h3>
+            <span class="expand-icon">▼</span>
+        </div>
+        <div class="card-body settings-body" style="display: none;">
+            <div class="control-row">
+                <label>Monthly DCA Amount: $<span id="dca-value">{{ monthly_dca }}</span></label>
+                <input type="range" id="dca-slider" min="50" max="1000" step="50" value="{{ monthly_dca }}" onchange="updateDCAValue()">
+            </div>
+            <div class="control-row">
+                <label>Goal BTC: <span id="goal-value">0.1</span> BTC</label>
+                <input type="range" id="goal-slider" min="0.01" max="1.0" step="0.01" value="0.1" onchange="updateGoalValue()">
+            </div>
+            <button class="btn-primary" onclick="refreshCharts()">Update Charts</button>
+            <button class="btn-secondary" onclick="resetDefaults()">Reset Defaults</button>
+        </div>
+    </section>
+
+    <!-- DCA Historical Backtest Simulator -->
+    <section class="card simulator-card">
+        <h3>🔬 DCA Simulator</h3>
+        <p class="card-subtitle">What if you'd started buying Bitcoin at a specific date?</p>
+
+        <div class="preset-buttons">
+            <button class="preset-btn" onclick="runPreset('2018-bear')">2018 Bear Market</button>
+            <button class="preset-btn" onclick="runPreset('2021-ath')">2021 ATH (Worst Case)</button>
+            <button class="preset-btn" onclick="runPreset('2022-crash')">2022 Crash</button>
+            <button class="preset-btn" onclick="runPreset('last-halving')">Last Halving (2024)</button>
+        </div>
+
+        <div class="custom-controls">
+            <h4>Or customize your scenario:</h4>
+            <div class="input-row">
+                <label>Start Date: <input type="date" id="sim-start" value="2020-01-01"></label>
+                <label>End Date: <input type="date" id="sim-end" value="2024-12-31"></label>
+            </div>
+            <div class="input-row">
+                <label>Amount: $<input type="number" id="sim-amount" value="200" min="10" max="10000"></label>
+                <label>Frequency:
+                    <select id="sim-freq">
+                        <option value="weekly">Weekly</option>
+                        <option value="biweekly">Bi-weekly</option>
+                        <option value="monthly" selected>Monthly</option>
+                    </select>
+                </label>
+            </div>
+            <button class="btn-primary" onclick="runCustomBacktest()">Run Simulation</button>
+        </div>
+
+        <div id="sim-results" class="sim-results" style="display: none;">
+            <h4>Results</h4>
+            <div class="result-grid">
+                <div class="result-item">
+                    <span class="result-label">Total Invested</span>
+                    <span class="result-value" id="result-invested">$0</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Current Value</span>
+                    <span class="result-value" id="result-value">$0</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">ROI</span>
+                    <span class="result-value" id="result-roi">0%</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">BTC Accumulated</span>
+                    <span class="result-value" id="result-btc">0 BTC</span>
+                </div>
+            </div>
+            <div id="chart-backtest" class="chart-container"></div>
+        </div>
+    </section>
+
     <!-- Row 3: Charts (2 columns) -->
     <section class="card card-chart">
-        <h3>Price & Key Levels</h3>
+        <h3>Price & Key Levels <span class="help-icon" title="Historical price with support/resistance levels. Use 3m/6m/1y/2y/All buttons to zoom timeframes.">?</span></h3>
         <div id="chart-price-levels" class="chart-container"></div>
     </section>
 
     <section class="card card-chart">
-        <h3>Cycle Comparison</h3>
+        <h3>Cycle Comparison <span class="help-icon" title="Compare current cycle to historical patterns. Each line shows price progression from halving day.">?</span></h3>
         <div id="chart-cycle-overlay" class="chart-container"></div>
     </section>
 
     <!-- Row 4: More Charts -->
     <section class="card card-chart">
-        <h3>Price Scenarios</h3>
+        <h3>Price Scenarios <span class="help-icon" title="Forward-looking price scenarios with key levels. Use 6m/1y/2y/All buttons to zoom.">?</span></h3>
         <div id="chart-scenario-fan" class="chart-container"></div>
     </section>
 
     <section class="card card-chart">
-        <h3>Path to Goal</h3>
+        <h3>Path to Goal <span class="help-icon" title="Projected timeline to reach your BTC goal. Bear markets = cheaper sats = faster accumulation.">?</span></h3>
         <div id="chart-goal-timeline" class="chart-container"></div>
     </section>
 
@@ -147,6 +222,93 @@
 
 {% block scripts %}
 <script>
+    // Settings panel controls
+    function toggleSettings() {
+        const body = document.querySelector('.settings-body');
+        const icon = document.querySelector('.expand-icon');
+        if (body.style.display === 'none') {
+            body.style.display = 'block';
+            icon.textContent = '▲';
+        } else {
+            body.style.display = 'none';
+            icon.textContent = '▼';
+        }
+    }
+
+    function updateDCAValue() {
+        document.getElementById('dca-value').textContent = document.getElementById('dca-slider').value;
+    }
+
+    function updateGoalValue() {
+        document.getElementById('goal-value').textContent = document.getElementById('goal-slider').value;
+    }
+
+    async function refreshCharts() {
+        const dcaAmount = document.getElementById('dca-slider').value;
+        const goalBTC = document.getElementById('goal-slider').value;
+
+        // Reload affected charts with new parameters
+        await loadChart('scenario_fan', 'chart-scenario-fan', `?monthly_dca=${dcaAmount}`);
+        await loadChart('goal_timeline', 'chart-goal-timeline', `?goal_btc=${goalBTC}`);
+    }
+
+    function resetDefaults() {
+        document.getElementById('dca-slider').value = {{ monthly_dca }};
+        document.getElementById('goal-slider').value = 0.1;
+        updateDCAValue();
+        updateGoalValue();
+        refreshCharts();
+    }
+
+    // DCA Simulator
+    const PRESETS = {
+        '2018-bear': { start: '2018-01-01', end: '2019-12-31', amount: 200, freq: 'monthly' },
+        '2021-ath': { start: '2021-11-01', end: '2026-02-09', amount: 200, freq: 'monthly' },
+        '2022-crash': { start: '2022-06-01', end: '2026-02-09', amount: 200, freq: 'weekly' },
+        'last-halving': { start: '2024-04-20', end: '2026-02-09', amount: 200, freq: 'monthly' },
+    };
+
+    async function runPreset(key) {
+        const preset = PRESETS[key];
+        document.getElementById('sim-start').value = preset.start;
+        document.getElementById('sim-end').value = preset.end;
+        document.getElementById('sim-amount').value = preset.amount;
+        document.getElementById('sim-freq').value = preset.freq;
+        await runCustomBacktest();
+    }
+
+    async function runCustomBacktest() {
+        const start = document.getElementById('sim-start').value;
+        const end = document.getElementById('sim-end').value;
+        const amount = document.getElementById('sim-amount').value;
+        const freq = document.getElementById('sim-freq').value;
+
+        try {
+            const url = `/api/backtest?start=${start}&end=${end}&amount=${amount}&frequency=${freq}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                alert('Error running simulation. Please check your dates.');
+                return;
+            }
+            const data = await response.json();
+
+            // Update results display
+            document.getElementById('result-invested').textContent = `$${data.total_invested.toLocaleString()}`;
+            document.getElementById('result-value').textContent = `$${data.current_value.toLocaleString()}`;
+            document.getElementById('result-roi').textContent = `${data.roi_pct > 0 ? '+' : ''}${data.roi_pct.toFixed(1)}%`;
+            document.getElementById('result-roi').style.color = data.roi_pct >= 0 ? '#10B981' : '#EF4444';
+            document.getElementById('result-btc').textContent = `${data.total_btc.toFixed(8)} BTC`;
+
+            // Load comparison chart
+            await loadChart('dca_backtest', 'chart-backtest', `?start=${start}&end=${end}&amount=${amount}&frequency=${freq}`);
+
+            document.getElementById('sim-results').style.display = 'block';
+        } catch (e) {
+            console.error('Simulation error:', e);
+            alert('Error running simulation. Please try again.');
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         loadChart('price_levels', 'chart-price-levels');
         loadChart('cycle_overlay', 'chart-cycle-overlay');

@@ -48,6 +48,17 @@ def _base_layout(title, height=500, **overrides):
         legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
         margin=dict(l=60, r=30, t=60, b=80),
         height=height,
+        xaxis=dict(
+            rangeselector=dict(
+                bgcolor=THEME["orange"],  # Bitcoin orange background
+                activecolor="#d67a0a",  # Darker orange for active state
+                font=dict(color="white", size=12, family=FONT_FAMILY),
+                borderwidth=2,
+                bordercolor=THEME["orange"],
+                x=0.01,
+                y=1.15,
+            ),
+        ),
     )
     layout.update(overrides)
     return layout
@@ -137,12 +148,21 @@ def scenario_fan(scenarios, current_price, key_levels, next_halving,
             gridcolor=THEME["grid"],
             showgrid=True,
             rangeslider_visible=False,
-            rangeselector=dict(buttons=[
-                dict(count=6, label="6m", step="month"),
-                dict(count=1, label="1y", step="year"),
-                dict(count=2, label="2y", step="year"),
-                dict(step="all", label="All"),
-            ]),
+            rangeselector=dict(
+                buttons=[
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="1y", step="year", stepmode="backward"),
+                    dict(count=2, label="2y", step="year", stepmode="backward"),
+                    dict(step="all", label="All"),
+                ],
+                bgcolor=THEME["orange"],
+                activecolor="#d67a0a",
+                font=dict(color="white", size=12, family=FONT_FAMILY),
+                borderwidth=2,
+                bordercolor=THEME["orange"],
+                x=0.01,
+                y=1.15,
+            ),
         ),
         yaxis=dict(
             gridcolor=THEME["grid"],
@@ -422,13 +442,22 @@ def price_levels(dates, prices, key_levels, cost_bases, ath_price, ath_date,
         xaxis=dict(
             gridcolor=THEME["grid"],
             rangeslider=dict(visible=True, thickness=0.05),
-            rangeselector=dict(buttons=[
-                dict(count=3, label="3m", step="month"),
-                dict(count=6, label="6m", step="month"),
-                dict(count=1, label="1y", step="year"),
-                dict(count=2, label="2y", step="year"),
-                dict(step="all", label="All"),
-            ]),
+            rangeselector=dict(
+                buttons=[
+                    dict(count=3, label="3m", step="month", stepmode="backward"),
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="1y", step="year", stepmode="backward"),
+                    dict(count=2, label="2y", step="year", stepmode="backward"),
+                    dict(step="all", label="All"),
+                ],
+                bgcolor=THEME["orange"],
+                activecolor="#d67a0a",
+                font=dict(color="white", size=12, family=FONT_FAMILY),
+                borderwidth=2,
+                bordercolor=THEME["orange"],
+                x=0.01,
+                y=1.15,
+            ),
         ),
         yaxis=dict(
             title="Price (USD)",
@@ -456,5 +485,94 @@ def price_levels(dates, prices, key_levels, cost_bases, ath_price, ath_date,
             )
         ]
     )
+
+    return fig
+
+
+def dca_backtest_chart(time_series, total_invested, current_value):
+    """
+    DCA backtest visualization showing portfolio growth vs invested.
+
+    Args:
+        time_series: list of {"date", "price", "btc_bought", "portfolio_value", "total_invested"}
+        total_invested: final amount invested
+        current_value: final portfolio value
+    """
+    if not time_series:
+        return go.Figure()
+
+    dates = [entry["date"] for entry in time_series]
+    values = [entry["portfolio_value"] for entry in time_series]
+    invested_line = [entry["total_invested"] for entry in time_series]
+
+    fig = go.Figure()
+
+    # Portfolio value line
+    fig.add_trace(go.Scatter(
+        x=dates,
+        y=values,
+        mode='lines',
+        name='Portfolio Value',
+        line=dict(color=THEME["green"], width=3),
+        fill='tonexty',
+        fillcolor='rgba(16, 185, 129, 0.1)',
+        hovertemplate="<b>%{x}</b><br>Value: $%{y:,.0f}<extra></extra>",
+    ))
+
+    # Total invested line (for comparison)
+    fig.add_trace(go.Scatter(
+        x=dates,
+        y=invested_line,
+        mode='lines',
+        name='Total Invested',
+        line=dict(color='#94a3b8', width=2, dash='dash'),
+        hovertemplate="<b>%{x}</b><br>Invested: $%{y:,.0f}<extra></extra>",
+    ))
+
+    # Buy markers (every 4th point for clarity)
+    buy_dates = [entry["date"] for i, entry in enumerate(time_series) if i % 4 == 0]
+    buy_values = [entry["portfolio_value"] for i, entry in enumerate(time_series) if i % 4 == 0]
+    fig.add_trace(go.Scatter(
+        x=buy_dates,
+        y=buy_values,
+        mode='markers',
+        name='Buy Points',
+        marker=dict(color=THEME["orange"], size=8, symbol='circle'),
+        hoverinfo='skip',
+    ))
+
+    # Calculate ROI for annotation
+    roi = ((current_value - total_invested) / total_invested * 100) if total_invested > 0 else 0
+    roi_color = THEME["green"] if roi >= 0 else THEME["red"]
+
+    # ROI annotation
+    fig.add_annotation(
+        x=0.98, y=0.98,
+        xref="paper", yref="paper",
+        text=f"<b>ROI: {roi:+.1f}%</b>",
+        showarrow=False,
+        font=dict(size=16, color=roi_color, family=FONT_FAMILY),
+        bgcolor="rgba(255,255,255,0.9)",
+        bordercolor=roi_color,
+        borderwidth=2,
+        borderpad=8,
+        xanchor="right", yanchor="top",
+    )
+
+    fig.update_layout(**_base_layout(
+        "DCA Backtest: Portfolio Growth Over Time",
+        height=400,
+        hovermode="x",
+        xaxis=dict(
+            title="Date",
+            gridcolor=THEME["grid"],
+        ),
+        yaxis=dict(
+            title="Value (USD)",
+            gridcolor=THEME["grid"],
+            tickprefix="$",
+            tickformat=",.0f",
+        ),
+    ))
 
     return fig

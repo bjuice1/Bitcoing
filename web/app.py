@@ -287,6 +287,18 @@ def create_app(config: dict, engines: dict) -> Flask:
         data = get_fresh_data()
         return render_template("partner.html", **data)
 
+    @app.route("/about")
+    def about():
+        """Serve the architecture diagram page."""
+        from pathlib import Path
+        diagram_path = Path(__file__).parent.parent / "data" / "architecture_diagram.html"
+        if diagram_path.exists():
+            with open(diagram_path, 'r') as f:
+                diagram_html = f.read()
+            return diagram_html
+        else:
+            return "Architecture diagram not found.", 404
+
     @app.route("/api/snapshot")
     def api_snapshot():
         data = get_fresh_data()
@@ -338,7 +350,10 @@ def create_app(config: dict, engines: dict) -> Flask:
 
         data = get_fresh_data()
         price = data["price_usd"] or 70000
-        monthly_dca = data["monthly_dca"]
+
+        # Get query parameters with defaults
+        monthly_dca = int(request.args.get('monthly_dca', data["monthly_dca"]))
+        goal_btc = float(request.args.get('goal_btc', 0.1))
 
         try:
             if chart_type == "scenario_fan":
@@ -357,7 +372,8 @@ def create_app(config: dict, engines: dict) -> Flask:
 
             elif chart_type == "goal_timeline":
                 if engines.get("goal_tracker"):
-                    goal_proj = engines["goal_tracker"].project_completion(price)
+                    # Use custom goal_btc if provided
+                    goal_proj = engines["goal_tracker"].project_completion(price, goal_btc=goal_btc)
                     chart_data = prepare_goal_timeline_data(goal_proj, monthly_dca)
                     if chart_data is None:
                         return jsonify({"error": "No active goal"}), 404
@@ -372,6 +388,25 @@ def create_app(config: dict, engines: dict) -> Flask:
                 if chart_data is None:
                     return jsonify({"error": "No price history"}), 404
                 fig = web_charts.price_levels(**chart_data)
+
+            elif chart_type == "dca_backtest":
+                # Get backtest data from API
+                from dca.engine import DCAEngine
+                start = request.args.get('start', '2020-01-01')
+                end = request.args.get('end', datetime.now().date().isoformat())
+                amount = float(request.args.get('amount', 200))
+                frequency = request.args.get('frequency', 'monthly')
+
+                try:
+                    engine = DCAEngine(engines["db"])
+                    result = engine.simulate(start, end, amount, frequency)
+                    fig = web_charts.dca_backtest_chart(
+                        time_series=result.time_series,
+                        total_invested=result.total_invested,
+                        current_value=result.current_value
+                    )
+                except ValueError as e:
+                    return jsonify({"error": str(e)}), 400
 
             else:
                 return jsonify({"error": f"Unknown chart type: {chart_type}"}), 404
@@ -397,5 +432,35 @@ def create_app(config: dict, engines: dict) -> Flask:
         db = engines["db"]
         alerts = db.get_recent_alerts(limit=limit)
         return jsonify({"alerts": alerts or [], "count": len(alerts or [])})
+
+    @app.route("/api/backtest")
+    def api_backtest():
+        """Run DCA backtest simulation."""
+        from dca.engine import DCAEngine
+
+        start = request.args.get('start', '2020-01-01')
+        end = request.args.get('end', datetime.now().date().isoformat())
+        amount = float(request.args.get('amount', 200))
+        frequency = request.args.get('frequency', 'monthly')
+
+        try:
+            engine = DCAEngine(engines["db"])
+            result = engine.simulate(start, end, amount, frequency)
+
+            return jsonify({
+                "total_invested": result.total_invested,
+                "current_value": result.current_value,
+                "roi_pct": result.roi_pct,
+                "total_btc": result.total_btc,
+                "avg_cost_basis": result.avg_cost_basis,
+                "num_buys": result.num_buys,
+                "max_drawdown_pct": result.max_drawdown_pct,
+                "time_series": result.time_series,
+            })
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        except Exception as e:
+            logger.error(f"Backtest error: {e}")
+            return jsonify({"error": "Simulation failed"}), 500
 
     return app
