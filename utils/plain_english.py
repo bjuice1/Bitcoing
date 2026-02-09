@@ -99,7 +99,7 @@ def explain_drawdown(pct, ath=None):
 
 
 def explain_hash_rate(difficulty_change_pct):
-    """Translate hash rate / mining health into plain English."""
+    """Translate network HR / mining health into plain English."""
     if difficulty_change_pct is None:
         return "Mining data is unavailable."
 
@@ -322,15 +322,15 @@ EDUCATIONAL_TOPICS = [
         ),
     },
     {
-        "title": "Why Does Hash Rate Matter?",
+        "title": "Why Does Network HR Matter?",
         "content": (
-            "Hash rate is the total computing power securing the Bitcoin network. "
+            "Network HR (hashrate) is the total computing power securing the Bitcoin network. "
             "When it goes up, it means miners are investing in more equipment -- "
             "they believe Bitcoin will be valuable enough to cover their costs.\n\n"
-            "When hash rate drops significantly, miners may be shutting down because "
+            "When network HR drops significantly, miners may be shutting down because "
             "they're losing money. This can signal a market bottom is near, because "
             "mining becomes unprofitable before prices recover.\n\n"
-            "Rising hash rate = healthy network, confident miners."
+            "Rising network HR = healthy network, confident miners."
         ),
     },
     {

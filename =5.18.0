@@ -1,0 +1,14 @@
+Collecting plotly
+  Downloading plotly-6.5.2-py3-none-any.whl.metadata (8.5 kB)
+Collecting narwhals>=1.15.1 (from plotly)
+  Downloading narwhals-2.16.0-py3-none-any.whl.metadata (14 kB)
+Requirement already satisfied: packaging in ./venv/lib/python3.11/site-packages (from plotly) (26.0)
+Downloading plotly-6.5.2-py3-none-any.whl (9.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 9.9/9.9 MB 38.4 MB/s eta 0:00:00
+Downloading narwhals-2.16.0-py3-none-any.whl (443 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 444.0/444.0 kB 28.0 MB/s eta 0:00:00
+Installing collected packages: narwhals, plotly
+Successfully installed narwhals-2.16.0 plotly-6.5.2
+
+[notice] A new release of pip is available: 24.0 -> 26.0.1
+[notice] To update, run: pip install --upgrade pip

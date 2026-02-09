@@ -192,10 +192,10 @@ class CycleAnalyzer:
             interp = f"{drawdown:.1f}% from ATH"
         signals.append(("Drawdown", status, drawdown, interp))
 
-        # Hash rate trend
+        # Network HR trend
         hr = snapshot.onchain.hash_rate_th if snapshot else 0
         if hr > 0:
-            # We'd need historical hash rate for trend; use difficulty_change as proxy
+            # We'd need historical network HR for trend; use difficulty_change as proxy
             diff_change = snapshot.onchain.difficulty_change_pct if snapshot else 0
             if diff_change < -10:
                 status = SignalStatus.BEARISH
@@ -206,7 +206,7 @@ class CycleAnalyzer:
             else:
                 status = SignalStatus.NEUTRAL
                 interp = f"Difficulty change {diff_change:.1f}% - stable"
-            signals.append(("Hash Rate / Mining", status, diff_change, interp))
+            signals.append(("Network HR / Mining", status, diff_change, interp))
 
         # BTC/Gold ratio
         gold = snapshot.sentiment.btc_gold_ratio if snapshot else 0

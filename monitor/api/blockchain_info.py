@@ -1,4 +1,4 @@
-"""Blockchain.com API client for hash rate and difficulty."""
+"""Blockchain.com API client for network HR and difficulty."""
 import logging
 from utils.http_client import HTTPClient
 from utils.rate_limiter import RateLimiter

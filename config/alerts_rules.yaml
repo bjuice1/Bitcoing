@@ -50,14 +50,14 @@ rules:
     description: "MVRV above 3.5 - historically overvalued zone"
 
   - id: hash_rate_decline
-    name: "Hash Rate Declining"
+    name: "Network HR Declining"
     metric: HASH_RATE_CHANGE_30D
     operator: "<"
     threshold: -15
     severity: WARNING
     cooldown_seconds: 86400
     enabled: true
-    description: "Hash rate down >15% in 30 days - miner stress/capitulation"
+    description: "Network HR down >15% in 30 days - miner stress/capitulation"
 
   - id: drawdown_deep
     name: "Deep Drawdown"

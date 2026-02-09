@@ -94,7 +94,7 @@ class AlertEngine:
                     derived["PRICE_CHANGE_30D"] = ((current - old_30) / old_30) * 100
                     derived["price_change_30d"] = derived["PRICE_CHANGE_30D"]
 
-        # Hash rate change (use difficulty change as proxy from snapshot)
+        # Network HR change (use difficulty change as proxy from snapshot)
         derived["HASH_RATE_CHANGE_30D"] = snapshot.onchain.difficulty_change_pct
         derived["hash_rate_change_30d"] = snapshot.onchain.difficulty_change_pct
 

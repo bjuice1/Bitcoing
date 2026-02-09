@@ -31,7 +31,7 @@ def format_pct(value, decimals=2, with_color=False):
 
 
 def format_hashrate(th_per_sec):
-    """Format hash rate from TH/s to appropriate unit."""
+    """Format network HR from TH/s to appropriate unit."""
     if th_per_sec is None:
         return "N/A"
     th_per_sec = float(th_per_sec)

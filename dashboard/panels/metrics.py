@@ -15,7 +15,7 @@ class MetricsPanel:
         table.add_column("label", style="dim", width=14)
         table.add_column("value")
 
-        table.add_row("Hash Rate", format_hashrate(o.hash_rate_th))
+        table.add_row("Network HR", format_hashrate(o.hash_rate_th))
         table.add_row("Difficulty", format_compact(o.difficulty))
 
         dc = o.difficulty_change_pct

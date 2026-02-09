@@ -268,7 +268,7 @@ def monitor_fetch(ctx, as_json, quiet):
         console.print(f"  Market Cap: ${snapshot.price.market_cap:,.0f}")
         console.print(f"  F&G: {snapshot.sentiment.fear_greed_value} ({snapshot.sentiment.fear_greed_label})")
         console.print(f"  MVRV: {snapshot.valuation.mvrv_ratio or 'N/A'}")
-        console.print(f"  Hash Rate: {snapshot.onchain.hash_rate_th:.2e} TH/s")
+        console.print(f"  Network HR: {snapshot.onchain.hash_rate_th:.2e} TH/s")
         console.print(f"  Dominance: {snapshot.sentiment.btc_dominance_pct:.1f}%")
         console.print(f"  BTC/Gold: {snapshot.sentiment.btc_gold_ratio:.1f} oz")
 
@@ -326,7 +326,7 @@ def monitor_status(ctx):
         ("24h Change", format_pct(summary["change_24h_pct"])),
         ("Market Cap", format_usd(summary["market_cap"], compact=True)),
         ("Volume 24h", format_usd(summary["volume_24h"], compact=True)),
-        ("Hash Rate", format_hashrate(summary["hash_rate_th"])),
+        ("Network HR", format_hashrate(summary["hash_rate_th"])),
         ("F&G Index", f"{summary['fear_greed_value']} ({summary['fear_greed_label']})"),
         ("MVRV", f"{summary['mvrv_ratio']:.2f}" if summary['mvrv_ratio'] else "N/A"),
         ("BTC/Gold", f"{summary['btc_gold_ratio']:.1f} oz"),

@@ -131,7 +131,7 @@ class HTMLReportGenerator:
         # Metrics section
         o = snapshot.onchain
         metrics_html = f"""
-        <div class="metric"><span class="label">Hash Rate</span><span class="value">{format_hashrate(o.hash_rate_th)}</span></div>
+        <div class="metric"><span class="label">Network HR</span><span class="value">{format_hashrate(o.hash_rate_th)}</span></div>
         <div class="metric"><span class="label">Difficulty Adj</span><span class="value">{format_pct(o.difficulty_change_pct)}</span></div>
         <div class="metric"><span class="label">F&G Index</span><span class="value">{snapshot.sentiment.fear_greed_value} ({snapshot.sentiment.fear_greed_label})</span></div>
         <div class="metric"><span class="label">MVRV</span><span class="value">{f'{snapshot.valuation.mvrv_ratio:.2f}' if snapshot.valuation.mvrv_ratio else 'N/A'}</span></div>
