@@ -17,7 +17,7 @@ api:
 
 monitor:
   fetch_interval: 900  # 15 minutes
-  backfill_start_year: 2015
+  backfill_start_year: 2013
 
 dca:
   default_amount: 100
@@ -26,8 +26,13 @@ dca:
 alerts:
   cooldown: 3600  # 1 hour between repeated alerts
   desktop_notifications: true
-  sound_on_critical: false
-  max_desktop_per_5min: 1
+
+notifications:
+  enabled: true
+  sound: "Purr"                    # macOS sound name for CRITICAL alerts
+  critical_rate_limit_minutes: 15
+  warning_rate_limit_minutes: 30
+  info_rate_limit_per_hour: 3
 
 dashboard:
   refresh_interval: 60  # seconds
@@ -56,6 +61,25 @@ telegram:
   action_alerts: true
   critical_alerts: true
   min_alert_severity: "WARNING"
+
+email:
+  enabled: false
+  smtp_host: "smtp.gmail.com"
+  smtp_port: 587
+  use_tls: true
+  smtp_username: ""
+  smtp_password: ""
+  from_address: ""
+  from_name: "Bitcoin Monitor"
+  to_address: ""
+  digest_enabled: true
+  critical_alerts_enabled: true
+
+service:
+  fetch_interval_minutes: 15
+  digest_day: 0          # 0=Sunday
+  digest_hour: 9         # 24h format
+  log_retention_days: 30 # How long to keep log files
 
 reference_levels:
   support: [60000, 65000, 70000, 75000, 80000]

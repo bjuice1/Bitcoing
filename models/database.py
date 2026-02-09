@@ -288,6 +288,50 @@ class Database:
         result["purchases"] = [dict(p) for p in purchases]
         return result
 
+    def get_price_gaps(self, start_date: str, end_date: str, max_gap_days: int = 3) -> list[tuple[str, str]]:
+        """Find gaps in price_history where consecutive missing days exceed max_gap_days."""
+        from datetime import date as d, timedelta
+        rows = self.conn.execute(
+            "SELECT date FROM price_history WHERE date BETWEEN ? AND ? ORDER BY date",
+            (start_date, end_date)
+        ).fetchall()
+        existing = {r["date"] for r in rows}
+
+        gaps = []
+        start = d.fromisoformat(start_date)
+        end = d.fromisoformat(end_date)
+        gap_start = None
+        gap_len = 0
+        current = start
+
+        while current <= end:
+            ds = current.isoformat()
+            if ds not in existing:
+                if gap_start is None:
+                    gap_start = ds
+                gap_len += 1
+            else:
+                if gap_start and gap_len >= max_gap_days:
+                    gaps.append((gap_start, (current - timedelta(days=1)).isoformat()))
+                gap_start = None
+                gap_len = 0
+            current += timedelta(days=1)
+
+        if gap_start and gap_len >= max_gap_days:
+            gaps.append((gap_start, end_date))
+
+        return gaps
+
+    def get_nearest_snapshot(self, target_timestamp: str) -> dict | None:
+        """Return the metrics_snapshot closest to target_timestamp (but not after)."""
+        row = self.conn.execute("""
+            SELECT * FROM metrics_snapshots
+            WHERE timestamp <= ?
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """, (target_timestamp,)).fetchone()
+        return dict(row) if row else None
+
     def list_portfolios(self):
         rows = self.conn.execute("""
             SELECT p.*, COUNT(pu.id) as num_purchases,

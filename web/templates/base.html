@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Bitcoin Monitor{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" charset="utf-8"
+            onerror="document.getElementById('chart-fallback').style.display='block'"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-left">
+            <h1 class="logo">&#x20BF; Bitcoin Monitor</h1>
+            <span class="phase-badge">{{ cycle_phase }}</span>
+        </div>
+        <div class="header-right">
+            <span class="data-age" id="data-age">{{ data_age }}</span>
+            <nav>
+                <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">Dashboard</a>
+                <a href="/partner" class="nav-link {% if request.path == '/partner' %}active{% endif %}">Partner</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <noscript><p>Charts require JavaScript.</p></noscript>
+        <div id="chart-fallback" style="display:none">
+            <p>Could not load chart library. <a href="javascript:location.reload()">Retry</a></p>
+        </div>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="app-footer">
+        <p>Bitcoin Cycle Monitor &mdash; Data refreshes every 60s</p>
+    </footer>
+
+    <script>
+        async function loadChart(type, divId) {
+            try {
+                const resp = await fetch('/api/chart/' + type);
+                if (!resp.ok) return;
+                const fig = await resp.json();
+                if (fig.error) return;
+                Plotly.newPlot(divId, fig.data, fig.layout, {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'],
+                    displaylogo: false,
+                    scrollZoom: false,
+                });
+            } catch (e) {
+                var el = document.getElementById(divId);
+                if (el) el.innerHTML = '<p class="chart-error">Chart unavailable. <a href="javascript:location.reload()">Retry</a></p>';
+            }
+        }
+
+        setInterval(async function() {
+            try {
+                var resp = await fetch('/api/snapshot');
+                var data = await resp.json();
+                var priceEl = document.getElementById('current-price');
+                if (priceEl) priceEl.textContent = '$' + data.price.usd.toLocaleString(undefined, {maximumFractionDigits: 0});
+                var signalEl = document.getElementById('signal-badge');
+                if (signalEl) {
+                    signalEl.textContent = data.signal.label;
+                    signalEl.className = 'signal-badge signal-' + data.signal.color.toLowerCase();
+                }
+                var ageEl = document.getElementById('data-age');
+                if (ageEl) {
+                    var s = data.data_age_seconds;
+                    ageEl.textContent = s < 60 ? 'Just now' : s < 3600 ? Math.floor(s/60) + 'm ago' : Math.floor(s/3600) + 'h ago';
+                }
+                var fgEl = document.getElementById('fear-greed-value');
+                if (fgEl) fgEl.textContent = data.fear_greed.value + ' \u2014 ' + data.fear_greed.label;
+            } catch (e) {
+                console.warn('Refresh failed:', e);
+            }
+        }, 60000);
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

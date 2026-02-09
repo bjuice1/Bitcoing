@@ -44,9 +44,21 @@ def _init_components(config_path=None, verbose=False):
     cycle = CycleAnalyzer(db)
 
     rules = RulesManager("config/alerts_rules.yaml")
-    channels = [ConsoleChannel(), FileChannel()]
-    if config.get("alerts", {}).get("desktop_notifications", True):
-        channels.append(DesktopChannel())
+    channels = [FileChannel()]  # Always log to file
+
+    # Console only if running interactively (not from launchd)
+    if sys.stdout.isatty():
+        channels.append(ConsoleChannel())
+
+    # Desktop notifications
+    if config.get("notifications", {}).get("enabled", True):
+        channels.append(DesktopChannel(config))
+
+    # Email for CRITICAL alerts
+    if config.get("email", {}).get("critical_alerts_enabled", False):
+        from alerts.channels import EmailChannel
+        channels.append(EmailChannel(config))
+
     alert_engine = AlertEngine(rules, db, channels)
 
     nadeau = NadeauSignalEvaluator(db)
@@ -262,14 +274,39 @@ def monitor_fetch(ctx, as_json, quiet):
 
 
 @monitor.command("backfill")
-@click.option("--start-year", default=2015, help="Year to start backfill from")
+@click.option("--full", is_flag=True, help="Full backfill from 2013 using multiple sources (slower)")
+@click.option("--start-year", default=2013, type=int, help="Start year for backfill")
 @click.pass_context
-def monitor_backfill(ctx, start_year):
+def monitor_backfill(ctx, full, start_year):
     """Backfill historical daily price data."""
     c = _get_components(ctx)
-    console.print(f"Backfilling price history from {start_year}...")
-    count = c["monitor"].backfill_history(start_year)
-    console.print(f"[green]✓[/green] Backfilled {count} daily price records")
+
+    if full:
+        console.print(f"[bold #F7931A]Full backfill from {start_year}[/bold #F7931A]")
+        console.print("Sources: CoinGecko (recent) + Yahoo Finance (2014+) + seed CSV (2013)\n")
+
+        from rich.progress import Progress
+        with Progress() as progress:
+            task = progress.add_task("Backfilling...", total=None)
+
+            def cb(added, total):
+                progress.update(task, completed=added, total=total)
+
+            result = c["monitor"].backfill_history(start_year=start_year, full=True, progress_callback=cb)
+
+        console.print(f"\n[green]✓[/green] Added {result.dates_added} days")
+        console.print(f"  Range: {result.date_range[0]} to {result.date_range[1]}")
+        console.print(f"  Sources: {', '.join(result.sources_used) or 'none needed (already complete)'}")
+        if result.gaps_remaining:
+            console.print(f"  [yellow]{len(result.gaps_remaining)} gap(s) remain[/yellow]")
+        if result.errors:
+            for err in result.errors:
+                console.print(f"  [red]{err}[/red]")
+    else:
+        console.print(f"Backfilling price history (last 365 days via CoinGecko)...")
+        count = c["monitor"].backfill_history(start_year=start_year, full=False)
+        console.print(f"[green]✓[/green] Backfilled {count} daily price records")
+        console.print("[dim]Tip: Use --full for complete history from 2013[/dim]")
 
 
 @monitor.command("status")
@@ -625,6 +662,46 @@ def alerts_rules(ctx):
 # ──────────────────────────────────────────────────────
 # DASHBOARD
 # ──────────────────────────────────────────────────────
+@cli.command()
+@click.option("--port", default=5000, type=int, help="Port to bind to")
+@click.option("--host", default="0.0.0.0", type=str, help="Host to bind to")
+@click.pass_context
+def web(ctx, port, host):
+    """Launch the web dashboard."""
+    from web.app import create_app
+    import socket
+
+    c = _get_components(ctx)
+    from utils.action_engine import ActionEngine
+    action_engine = ActionEngine(c["cycle"], c["monitor"], c["goal_tracker"])
+
+    engines = {
+        "monitor": c["monitor"],
+        "cycle": c["cycle"],
+        "alert_engine": c["alert_engine"],
+        "nadeau": c["nadeau"],
+        "action_engine": action_engine,
+        "db": c["db"],
+        "dca_portfolio": c["dca_tracker"],
+        "goal_tracker": c["goal_tracker"],
+    }
+
+    app = create_app(c["config"], engines)
+
+    try:
+        local_ip = socket.gethostbyname(socket.gethostname())
+    except Exception:
+        local_ip = "127.0.0.1"
+
+    console.print(f"\n[bold #F7931A]Bitcoin Cycle Monitor -- Web Dashboard[/bold #F7931A]\n")
+    console.print(f"  Local:    http://localhost:{port}")
+    console.print(f"  Network:  http://{local_ip}:{port}")
+    console.print(f"  Partner:  http://{local_ip}:{port}/partner")
+    console.print(f"\n  Press Ctrl+C to stop.\n")
+
+    app.run(host=host, port=port, debug=False)
+
+
 @cli.command()
 @click.option("--refresh", default=60, type=int, help="Refresh interval in seconds")
 @click.pass_context
@@ -1130,6 +1207,332 @@ def telegram_send_action(ctx):
     rec = engine.get_action(snapshot, signals)
     bot.send_action(rec)
     console.print("[green]Action sent via Telegram![/green]")
+
+
+# ──────────────────────────────────────────────────────
+# SERVICE (launchd automation)
+# ──────────────────────────────────────────────────────
+@cli.group()
+def service():
+    """Manage background automation (macOS launchd)."""
+    pass
+
+
+@service.command("install")
+@click.option("--fetch-interval", default=15, type=int, help="Fetch interval in minutes (default: 15)")
+@click.option("--digest-day", default=0, type=int, help="Digest day: 0=Sun, 1=Mon, ... (default: 0)")
+@click.option("--digest-hour", default=9, type=int, help="Digest hour in 24h format (default: 9)")
+@click.pass_context
+def service_install(ctx, fetch_interval, digest_day, digest_hour):
+    """Install launchd jobs for background monitoring."""
+    from service.launchd import LaunchdManager
+
+    project_dir = os.path.dirname(os.path.abspath(__file__))
+    manager = LaunchdManager(project_dir)
+
+    console.print("\n[bold #F7931A]Installing Bitcoin Monitor background services...[/bold #F7931A]\n")
+
+    results = manager.install(
+        fetch_interval=fetch_interval,
+        digest_day=digest_day,
+        digest_hour=digest_hour,
+    )
+
+    day_names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+
+    for job, status in results.items():
+        if status == "installed":
+            console.print(f"  [green]{job}:[/green] installed and loaded")
+        else:
+            console.print(f"  [red]{job}:[/red] {status}")
+
+    console.print(f"\n  Fetch: every {fetch_interval} minutes")
+    console.print(f"  Digest: {day_names[digest_day]}s at {digest_hour:02d}:00")
+    console.print(f"  Logs: ~/Library/Logs/bitcoin-monitor/")
+    console.print(f"\n  Run [dim]python main.py service status[/dim] to verify.")
+    console.print(f"  Run [dim]python main.py service logs[/dim] to view output.\n")
+
+
+@service.command("uninstall")
+@click.pass_context
+def service_uninstall(ctx):
+    """Remove launchd jobs."""
+    from service.launchd import LaunchdManager
+
+    project_dir = os.path.dirname(os.path.abspath(__file__))
+    manager = LaunchdManager(project_dir)
+
+    console.print("\n[bold #F7931A]Removing Bitcoin Monitor background services...[/bold #F7931A]\n")
+    results = manager.uninstall()
+
+    for job, status in results.items():
+        if status == "removed":
+            console.print(f"  [green]{job}:[/green] removed")
+        elif status == "not installed":
+            console.print(f"  [dim]{job}:[/dim] not installed")
+        else:
+            console.print(f"  [red]{job}:[/red] {status}")
+
+    console.print()
+
+
+@service.command("status")
+@click.pass_context
+def service_status(ctx):
+    """Check if background jobs are running."""
+    from service.launchd import LaunchdManager
+
+    project_dir = os.path.dirname(os.path.abspath(__file__))
+    manager = LaunchdManager(project_dir)
+
+    console.print("\n[bold #F7931A]Bitcoin Monitor Service Status[/bold #F7931A]\n")
+    status = manager.status()
+
+    for job, info in status.items():
+        if info["loaded"]:
+            state = "[green]running[/green]" if info["running"] else "[yellow]loaded (idle)[/yellow]"
+            pid_str = f" (PID {info['pid']})" if info["pid"] else ""
+            exit_str = f"  last exit: {info['last_exit']}" if info.get("last_exit") is not None else ""
+            console.print(f"  {job}: {state}{pid_str}{exit_str}")
+            if info.get("last_log_line"):
+                console.print(f"    [dim]{info['last_log_line']}[/dim]")
+        else:
+            console.print(f"  {job}: [dim]not installed[/dim]")
+
+    console.print(f"\n  [dim]Install: python main.py service install[/dim]")
+    console.print(f"  [dim]Logs:    python main.py service logs[/dim]\n")
+
+
+@service.command("logs")
+@click.option("--job", type=click.Choice(["fetch", "digest", "all"]), default="all")
+@click.option("--lines", default=50, type=int, help="Number of lines to show")
+@click.pass_context
+def service_logs(ctx, job, lines):
+    """Show recent log output."""
+    from service.launchd import LaunchdManager
+
+    project_dir = os.path.dirname(os.path.abspath(__file__))
+    manager = LaunchdManager(project_dir)
+
+    output = manager.get_logs(job=job, lines=lines)
+    console.print(output)
+
+
+@service.command("run-fetch")
+@click.pass_context
+def service_run_fetch(ctx):
+    """Single fetch cycle (called by launchd, not for manual use)."""
+    import logging as _logging
+    from service.launchd import rotate_logs
+
+    logger = _logging.getLogger("bitcoin-monitor")
+    logger.info(f"=== Fetch cycle started at {datetime.now().isoformat()} ===")
+
+    rotate_logs()
+
+    c = _get_components(ctx)
+    monitor = c["monitor"]
+    alert_engine = c["alert_engine"]
+
+    try:
+        # Fetch and store
+        snapshot = monitor.fetch_and_store()
+        if snapshot is None:
+            logger.error("Fetch returned no data")
+            raise SystemExit(1)
+
+        logger.info(f"Fetched: BTC ${snapshot.price.price_usd:,.0f}, "
+                    f"F&G {snapshot.sentiment.fear_greed_value}")
+
+        # Evaluate alert rules
+        triggered = alert_engine.check(snapshot)
+        if triggered:
+            logger.info(f"Alerts triggered: {len(triggered)}")
+            for alert in triggered:
+                sev = alert.severity.value if hasattr(alert.severity, 'value') else str(alert.severity)
+                logger.info(f"  [{sev}] {alert.rule_name}: {alert.message}")
+        else:
+            logger.info("No alerts triggered")
+
+        logger.info("=== Fetch cycle completed successfully ===\n")
+
+    except SystemExit:
+        raise
+    except Exception as e:
+        logger.error(f"Fetch cycle failed: {e}", exc_info=True)
+        raise SystemExit(1)
+
+
+@service.command("run-digest")
+@click.pass_context
+def service_run_digest(ctx):
+    """Single digest cycle (called by launchd, not for manual use)."""
+    import logging as _logging
+    from service.launchd import rotate_logs
+
+    logger = _logging.getLogger("bitcoin-monitor")
+    logger.info(f"=== Digest cycle started at {datetime.now().isoformat()} ===")
+
+    rotate_logs()
+
+    c = _get_components(ctx)
+    config = c["config"]
+
+    # Check if email is configured
+    email_config = config.get("email", {})
+    if not email_config.get("enabled") or not email_config.get("digest_enabled"):
+        logger.info("Email digest not enabled — skipping")
+        raise SystemExit(0)
+
+    try:
+        from notifications.email_sender import EmailSender
+        from digest.weekly_digest import WeeklyDigest
+
+        sender = EmailSender(config)
+        if not sender.is_configured():
+            logger.warning("Email not fully configured — skipping digest")
+            raise SystemExit(0)
+
+        # Generate digest
+        logger.info("Generating weekly digest...")
+        wd = WeeklyDigest(c["monitor"], c["cycle"], c["alert_engine"], c["nadeau"], c["db"])
+        html = wd.format_html()
+
+        logger.info(f"Digest generated: {len(html)} chars HTML")
+
+        # Send email
+        result = sender.send_digest(html, subject="Your Weekly Bitcoin Digest")
+        if result:
+            logger.info(f"Digest email sent to {sender.to_address}")
+
+            # Desktop notification
+            try:
+                import subprocess as sp
+                sp.run(["osascript", "-e",
+                        'display notification "Weekly digest sent to your inbox" '
+                        'with title "Bitcoin Monitor" sound name "Purr"'],
+                       capture_output=True, timeout=5)
+            except Exception:
+                pass
+        else:
+            logger.error("Failed to send digest email")
+            raise SystemExit(1)
+
+        logger.info("=== Digest cycle completed successfully ===\n")
+
+    except SystemExit:
+        raise
+    except Exception as e:
+        logger.error(f"Digest cycle failed: {e}", exc_info=True)
+        raise SystemExit(1)
+
+
+# ──────────────────────────────────────────────────────
+# EMAIL
+# ──────────────────────────────────────────────────────
+@cli.group()
+def email():
+    """Email configuration and sending."""
+    pass
+
+
+@email.command("setup")
+@click.pass_context
+def email_setup(ctx):
+    """Interactive email setup wizard."""
+    from rich.prompt import Prompt, Confirm
+    import yaml
+
+    console.print("\n[bold #F7931A]Email Setup[/bold #F7931A]\n")
+    console.print("You'll need SMTP credentials. For Gmail, use an App Password:")
+    console.print("  https://myaccount.google.com/apppasswords\n")
+
+    smtp_host = Prompt.ask("SMTP host", default="smtp.gmail.com")
+    smtp_port = Prompt.ask("SMTP port", default="587")
+    from_addr = Prompt.ask("From email address")
+    to_addr = Prompt.ask("To email address (where digests go)")
+    username = Prompt.ask("SMTP username (usually your email)")
+    password = Prompt.ask("SMTP password (app password)", password=True)
+
+    email_config = {
+        "enabled": True,
+        "smtp_host": smtp_host,
+        "smtp_port": int(smtp_port),
+        "from_address": from_addr,
+        "to_address": to_addr,
+        "smtp_username": username,
+        "smtp_password": password,
+        "use_tls": True,
+        "digest_enabled": True,
+        "critical_alerts_enabled": True,
+    }
+
+    user_config_path = Path("config/user_config.yaml")
+    user_config = {}
+    if user_config_path.exists():
+        with open(user_config_path) as f:
+            user_config = yaml.safe_load(f) or {}
+    user_config["email"] = email_config
+    with open(user_config_path, "w") as f:
+        yaml.dump(user_config, f, default_flow_style=False, sort_keys=False)
+
+    console.print(f"\n[green]Config saved to {user_config_path}[/green]")
+
+    if Confirm.ask("Test the connection now?"):
+        from notifications.email_sender import EmailSender
+        sender = EmailSender({"email": email_config})
+        result = sender.test_connection()
+        if result["status"] == "ok":
+            console.print("[green]Connection successful![/green]")
+        else:
+            console.print(f"[red]Failed:[/red] {result['message']}")
+
+
+@email.command("test")
+@click.pass_context
+def email_test(ctx):
+    """Send a test email."""
+    c = _get_components(ctx)
+    from notifications.email_sender import EmailSender
+    sender = EmailSender(c["config"])
+
+    if not sender.is_configured():
+        console.print("[red]Email not configured.[/red] Run: python main.py email setup")
+        return
+
+    result = sender.send_digest(
+        html_content="<h1>Test Email</h1><p>Bitcoin Cycle Monitor email is working.</p>",
+        subject="BTC Monitor -- Test Email",
+    )
+    if result:
+        console.print(f"[green]Test email sent to {sender.to_address}[/green]")
+    else:
+        console.print("[red]Failed to send test email. Check logs.[/red]")
+
+
+@email.command("send-digest")
+@click.pass_context
+def email_send_digest(ctx):
+    """Send the weekly digest via email."""
+    c = _get_components(ctx)
+    from notifications.email_sender import EmailSender
+    from digest.weekly_digest import WeeklyDigest
+
+    sender = EmailSender(c["config"])
+    if not sender.is_configured():
+        console.print("[red]Email not configured.[/red] Run: python main.py email setup")
+        return
+
+    console.print("[bold #F7931A]Generating weekly digest...[/bold #F7931A]")
+
+    wd = WeeklyDigest(c["monitor"], c["cycle"], c["alert_engine"], c["nadeau"], c["db"])
+    html = wd.format_html()
+
+    result = sender.send_digest(html, subject="Your Weekly Bitcoin Digest")
+    if result:
+        console.print(f"[green]Digest sent to {sender.to_address}[/green]")
+    else:
+        console.print("[red]Failed to send digest.[/red]")
 
 
 if __name__ == "__main__":

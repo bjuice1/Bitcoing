@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Bitcoin Update &mdash; Partner View{% endblock %}
+
+{% block content %}
+<div class="partner-container">
+
+    <!-- Traffic Light Signal -->
+    <section class="traffic-light-hero traffic-{{ signal_color | lower }}">
+        <div class="traffic-circle"></div>
+        <h2 class="traffic-label">{{ signal_label }}</h2>
+        <p class="traffic-action">{{ signal_action }}</p>
+    </section>
+
+    <!-- Price Summary (plain English) -->
+    <section class="card partner-card">
+        <h3>What's Happening</h3>
+        <ul class="plain-list">
+            <li>Bitcoin is at <strong>${{ price_usd | format_usd }}</strong>
+                ({{ 'up' if change_24h >= 0 else 'down' }} {{ change_24h | abs | format_pct }} today)</li>
+            <li>The market mood is <strong>{{ fear_greed_label }}</strong> ({{ fear_greed_value }}/100)</li>
+            <li>{{ cycle_explanation }}</li>
+        </ul>
+    </section>
+
+    <!-- Goal Progress (if exists) -->
+    {% if goal_progress %}
+    <section class="card partner-card">
+        <h3>Our Bitcoin Goal</h3>
+        <div class="goal-progress">
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" style="width: {{ goal_progress.pct_complete | default(0) }}%">
+                    {{ goal_progress.pct_complete | default(0) | round(1) }}%
+                </div>
+            </div>
+            <div class="goal-stats">
+                <div class="goal-stat">
+                    <span class="stat-label">Stacked</span>
+                    <span class="stat-value">{{ ((goal_progress.total_btc | default(0)) * 100000000) | int | format_sats }} sats</span>
+                </div>
+                <div class="goal-stat">
+                    <span class="stat-label">Worth</span>
+                    <span class="stat-value">${{ goal_progress.current_value | default(0) | format_usd }}</span>
+                </div>
+                <div class="goal-stat">
+                    <span class="stat-label">Remaining</span>
+                    <span class="stat-value">
+                        {% if goal_progress.months_remaining %}
+                            ~{{ goal_progress.months_remaining | round(0) | int }} months
+                        {% else %}
+                            Calculating...
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- DCA Explanation -->
+    <section class="card partner-card">
+        <h3>Our Strategy</h3>
+        <p>{{ strategy_explanation }}</p>
+        <p class="dca-detail">
+            At today's price, our ${{ monthly_dca }}/month buys
+            <strong>{{ sats_per_month | format_sats }} sats</strong>.
+        </p>
+    </section>
+
+    <!-- Two Charts -->
+    <section class="card partner-card">
+        <h3>Where This Could Go</h3>
+        <div id="chart-scenario-fan-partner" class="chart-container"></div>
+    </section>
+
+    <section class="card partner-card">
+        <h3>Path to Our Goal</h3>
+        <div id="chart-goal-timeline-partner" class="chart-container"></div>
+    </section>
+
+    <!-- Educational Tidbit -->
+    <section class="card partner-card fun-fact">
+        <h3>Did You Know?</h3>
+        <p>{{ education_content }}</p>
+    </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        loadChart('scenario_fan', 'chart-scenario-fan-partner');
+        loadChart('goal_timeline', 'chart-goal-timeline-partner');
+    });
+</script>
+{% endblock %}

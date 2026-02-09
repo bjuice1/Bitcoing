@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Bitcoin Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-grid">
+
+    <!-- Row 1: Price Hero + Signal -->
+    <section class="card card-hero">
+        <div class="price-display">
+            <span class="price-label">Bitcoin</span>
+            <span class="price-value" id="current-price">${{ price_usd | format_usd }}</span>
+            <span class="price-change {{ 'up' if change_24h >= 0 else 'down' }}">
+                {{ change_24h | format_pct }}
+            </span>
+        </div>
+        <div class="signal-display">
+            <span class="signal-badge signal-{{ signal_color | lower }}" id="signal-badge">
+                {{ signal_label }}
+            </span>
+            <p class="signal-action">{{ signal_action }}</p>
+        </div>
+    </section>
+
+    <!-- Row 2: Key Metrics (4 cards) -->
+    <section class="card metric-card">
+        <h3>Fear & Greed</h3>
+        <div class="metric-value" id="fear-greed-value">{{ fear_greed_value }} &mdash; {{ fear_greed_label }}</div>
+        <div class="metric-bar">
+            <div class="metric-bar-fill fg-{{ fear_greed_zone }}" style="width: {{ fear_greed_value }}%"></div>
+        </div>
+    </section>
+
+    <section class="card metric-card">
+        <h3>MVRV Ratio</h3>
+        <div class="metric-value">{{ mvrv_ratio | round(2) }}</div>
+        <div class="metric-subtitle">{{ mvrv_zone }}</div>
+    </section>
+
+    <section class="card metric-card">
+        <h3>Cycle Position</h3>
+        <div class="metric-value">Day {{ days_since_halving }}</div>
+        <div class="metric-bar">
+            <div class="metric-bar-fill cycle-bar" style="width: {{ cycle_pct }}%"></div>
+        </div>
+        <div class="metric-subtitle">{{ cycle_pct | round(1) }}% through cycle</div>
+    </section>
+
+    <section class="card metric-card">
+        <h3>Drawdown from ATH</h3>
+        <div class="metric-value drawdown">{{ drawdown_pct | format_pct }}</div>
+        <div class="metric-subtitle">ATH: ${{ ath_price | format_usd }}</div>
+    </section>
+
+    <!-- Row 3: Charts (2 columns) -->
+    <section class="card card-chart">
+        <h3>Price & Key Levels</h3>
+        <div id="chart-price-levels" class="chart-container"></div>
+    </section>
+
+    <section class="card card-chart">
+        <h3>Cycle Comparison</h3>
+        <div id="chart-cycle-overlay" class="chart-container"></div>
+    </section>
+
+    <!-- Row 4: More Charts -->
+    <section class="card card-chart">
+        <h3>Price Scenarios</h3>
+        <div id="chart-scenario-fan" class="chart-container"></div>
+    </section>
+
+    <section class="card card-chart">
+        <h3>Path to Goal</h3>
+        <div id="chart-goal-timeline" class="chart-container"></div>
+    </section>
+
+    <!-- Row 5: Nadeau Signals + Alerts + Action -->
+    <section class="card">
+        <h3>Nadeau Signals</h3>
+        <div class="signal-grid">
+            {% for signal in nadeau_signals %}
+            <div class="signal-row">
+                <span class="signal-name">{{ signal.name }}</span>
+                <span class="signal-status signal-{{ signal.status | lower }}">
+                    {{ signal.status }}
+                </span>
+            </div>
+            {% endfor %}
+            {% if not nadeau_signals %}
+            <p class="empty-state">No signal data</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="card">
+        <h3>Recent Alerts</h3>
+        <div class="alerts-list" id="alerts-list">
+            {% for alert in recent_alerts[:5] %}
+            <div class="alert-item alert-{{ alert.severity | lower }}">
+                <span class="alert-time">{{ alert.triggered_at | time_ago }}</span>
+                <span class="alert-name">{{ alert.rule_name }}</span>
+                <span class="alert-severity">{{ alert.severity }}</span>
+            </div>
+            {% endfor %}
+            {% if not recent_alerts %}
+            <p class="empty-state">No recent alerts</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="card card-action">
+        <h3>What Should I Do?</h3>
+        <div class="action-recommendation">
+            <span class="action-badge action-{{ action_type | lower }}">{{ action_type }}</span>
+            <p class="action-explanation">{{ action_explanation }}</p>
+        </div>
+    </section>
+
+    <!-- Row 6: Portfolio (if exists) -->
+    {% if portfolio %}
+    <section class="card card-wide">
+        <h3>DCA Portfolio</h3>
+        <div class="portfolio-grid">
+            <div class="portfolio-stat">
+                <span class="stat-label">Total BTC</span>
+                <span class="stat-value">{{ portfolio.total_btc | format_btc }}</span>
+            </div>
+            <div class="portfolio-stat">
+                <span class="stat-label">Invested</span>
+                <span class="stat-value">${{ portfolio.total_invested | format_usd }}</span>
+            </div>
+            <div class="portfolio-stat">
+                <span class="stat-label">Current Value</span>
+                <span class="stat-value">${{ portfolio.current_value | format_usd }}</span>
+            </div>
+            <div class="portfolio-stat">
+                <span class="stat-label">ROI</span>
+                <span class="stat-value {{ 'up' if portfolio.roi_pct >= 0 else 'down' }}">
+                    {{ portfolio.roi_pct | format_pct }}
+                </span>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        loadChart('price_levels', 'chart-price-levels');
+        loadChart('cycle_overlay', 'chart-cycle-overlay');
+        loadChart('scenario_fan', 'chart-scenario-fan');
+        loadChart('goal_timeline', 'chart-goal-timeline');
+    });
+</script>
+{% endblock %}

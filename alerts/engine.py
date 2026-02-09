@@ -98,11 +98,27 @@ class AlertEngine:
         derived["HASH_RATE_CHANGE_30D"] = snapshot.onchain.difficulty_change_pct
         derived["hash_rate_change_30d"] = snapshot.onchain.difficulty_change_pct
 
-        # BTC/Gold change (would need historical gold data; placeholder)
-        derived["BTC_GOLD_CHANGE_30D"] = 0
-        derived["btc_gold_change_30d"] = 0
+        # BTC/Gold 30d change from historical snapshots
+        btc_gold_change = self._compute_btc_gold_change_30d(snapshot)
+        derived["BTC_GOLD_CHANGE_30D"] = btc_gold_change
+        derived["btc_gold_change_30d"] = btc_gold_change
 
         return derived
+
+    def _compute_btc_gold_change_30d(self, snapshot) -> float:
+        """Compare current BTC/Gold ratio to 30-day-old snapshot."""
+        try:
+            from datetime import timedelta
+            thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+            old_snapshot = self.db.get_nearest_snapshot(thirty_days_ago)
+            if old_snapshot and old_snapshot.get("btc_gold_ratio"):
+                current = snapshot.sentiment.btc_gold_ratio
+                old = old_snapshot["btc_gold_ratio"]
+                if old > 0 and current > 0:
+                    return ((current - old) / old) * 100
+        except Exception as e:
+            logger.debug(f"BTC/Gold 30d calculation failed: {e}")
+        return 0.0
 
     def evaluate_rules(self, snapshot, ignore_cooldowns=False):
         """Evaluate all enabled rules against current snapshot."""

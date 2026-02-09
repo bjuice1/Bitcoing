@@ -101,11 +101,24 @@ class BitcoinMonitor:
             "timestamp": snapshot.timestamp,
         }
 
-    def backfill_history(self, start_year=2015, progress_callback=None):
-        """Backfill historical daily prices."""
+    def backfill_history(self, start_year=2015, full=False, progress_callback=None):
+        """Backfill historical daily prices.
+
+        Args:
+            start_year: How far back to fetch (default 2015, use 2013 with full=True)
+            full: If True, use multi-source backfill (yfinance + CSV + CoinGecko)
+                  If False, use CoinGecko only (last 365 days, fast)
+            progress_callback: fn(dates_added, total_needed) or fn(count)
+        """
         existing = self.db.get_price_date_range()
         logger.info(f"Existing data: {existing['min_date']} to {existing['max_date']}")
-        count = self.api.backfill_prices(start_year, self.db)
-        if progress_callback:
-            progress_callback(count)
-        return count
+
+        if full:
+            from monitor.backfill import BackfillOrchestrator
+            orchestrator = BackfillOrchestrator(self.db, self.config)
+            return orchestrator.run(start_year=start_year, progress_callback=progress_callback)
+        else:
+            count = self.api.backfill_prices(start_year, self.db)
+            if progress_callback:
+                progress_callback(count)
+            return count
