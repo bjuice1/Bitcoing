@@ -291,13 +291,27 @@ def create_app(config: dict, engines: dict) -> Flask:
     def about():
         """Serve the architecture diagram page."""
         from pathlib import Path
-        diagram_path = Path(__file__).parent.parent / "data" / "architecture_diagram.html"
-        if diagram_path.exists():
-            with open(diagram_path, 'r') as f:
-                diagram_html = f.read()
-            return diagram_html
-        else:
-            return "Architecture diagram not found.", 404
+        import os
+
+        # Try multiple possible paths
+        possible_paths = [
+            Path(__file__).parent.parent / "data" / "architecture_diagram.html",
+            Path("data") / "architecture_diagram.html",
+            Path(os.getcwd()) / "data" / "architecture_diagram.html",
+        ]
+
+        for diagram_path in possible_paths:
+            if diagram_path.exists():
+                logger.info(f"Loading architecture diagram from: {diagram_path}")
+                with open(diagram_path, 'r') as f:
+                    diagram_html = f.read()
+                return diagram_html
+
+        # Log all attempted paths for debugging
+        logger.error(f"Architecture diagram not found. Tried: {[str(p) for p in possible_paths]}")
+        logger.error(f"Current working directory: {os.getcwd()}")
+        logger.error(f"__file__ location: {__file__}")
+        return "Architecture diagram not found. Please contact support.", 404
 
     @app.route("/api/snapshot")
     def api_snapshot():
