@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Cycle Monitor — System Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    background: #0D1117;
+    color: #E6EDF3;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .header {
+    text-align: center;
+    padding: 40px 20px 20px;
+  }
+  .header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #F7931A, #FFD93D);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .header p {
+    color: #8B949E;
+    font-size: 1rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .diagram {
+    max-width: 1200px;
+    margin: 30px auto;
+    padding: 0 20px;
+  }
+
+  /* Row layout */
+  .row {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .row.narrow { max-width: 800px; margin-left: auto; margin-right: auto; }
+
+  /* Arrow rows */
+  .arrows {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin: 6px 0;
+    font-size: 1.6rem;
+    color: #F7931A;
+    opacity: 0.7;
+  }
+  .arrows.wide { letter-spacing: 40px; }
+  .arrows.spread {
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+    justify-content: space-around;
+  }
+
+  /* Cards */
+  .card {
+    border-radius: 14px;
+    padding: 16px 20px;
+    text-align: center;
+    min-width: 140px;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  }
+  .card .icon { font-size: 1.6rem; margin-bottom: 6px; }
+  .card .title { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+  .card .sub { font-size: 0.75rem; opacity: 0.7; line-height: 1.3; }
+
+  /* Card types */
+  .api {
+    background: linear-gradient(135deg, #1A1F2E, #1E2636);
+    border: 1px solid #30363D;
+  }
+  .api .title { color: #58A6FF; }
+
+  .core {
+    background: linear-gradient(135deg, #2D1B00, #1A1200);
+    border: 1px solid #F7931A44;
+  }
+  .core .title { color: #F7931A; }
+
+  .engine {
+    background: linear-gradient(135deg, #0B2E1B, #0A1F14);
+    border: 1px solid #00B89444;
+  }
+  .engine .title { color: #00B894; }
+
+  .output {
+    background: linear-gradient(135deg, #1B0B2E, #140A1F);
+    border: 1px solid #6C5CE744;
+  }
+  .output .title { color: #A78BFA; }
+
+  .alert-card {
+    background: linear-gradient(135deg, #2E1B1B, #1F0A0A);
+    border: 1px solid #FF6B6B44;
+  }
+  .alert-card .title { color: #FF6B6B; }
+
+  .highlight {
+    background: linear-gradient(135deg, #F7931A22, #F7931A11);
+    border: 2px solid #F7931A66;
+  }
+  .highlight .title { color: #FFD93D; }
+
+  /* Section labels */
+  .section-label {
+    text-align: center;
+    margin: 24px 0 10px;
+    position: relative;
+  }
+  .section-label span {
+    background: #0D1117;
+    padding: 0 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #8B949E;
+    position: relative;
+    z-index: 1;
+  }
+  .section-label::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: #21262D;
+  }
+
+  /* Flow connector */
+  .flow-line {
+    width: 2px;
+    height: 20px;
+    background: linear-gradient(to bottom, #F7931A, #F7931A88);
+    margin: 0 auto;
+    border-radius: 1px;
+  }
+  .flow-line.wide {
+    width: 60%;
+    height: 2px;
+    max-width: 800px;
+    background: linear-gradient(to right, transparent, #F7931A44, transparent);
+    margin: 8px auto;
+  }
+
+  /* Big merge node */
+  .merge-node {
+    width: 200px;
+    margin: 0 auto;
+    padding: 14px 20px;
+    border-radius: 50px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  /* Legend */
+  .legend {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px 30px;
+    background: #161B22;
+    border-radius: 14px;
+    border: 1px solid #21262D;
+  }
+  .legend h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #8B949E;
+    margin-bottom: 14px;
+  }
+  .legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Stats bar */
+  .stats {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin: 30px 0;
+    flex-wrap: wrap;
+  }
+  .stat { text-align: center; }
+  .stat .num {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #F7931A;
+  }
+  .stat .label {
+    font-size: 0.75rem;
+    color: #8B949E;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .footer {
+    text-align: center;
+    padding: 30px;
+    color: #484F58;
+    font-size: 0.8rem;
+  }
+
+  /* Fan-out arrows using SVG */
+  .fan-svg {
+    display: block;
+    margin: 0 auto;
+    overflow: visible;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Bitcoin Cycle Monitor</h1>
+  <p>How data flows from free APIs through analysis engines to your screen</p>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="num">5</div><div class="label">Free APIs</div></div>
+  <div class="stat"><div class="num">28</div><div class="label">CLI Commands</div></div>
+  <div class="stat"><div class="num">9</div><div class="label">Chart Types</div></div>
+  <div class="stat"><div class="num">128</div><div class="label">Tests</div></div>
+  <div class="stat"><div class="num">0</div><div class="label">Cost</div></div>
+</div>
+
+<div class="diagram">
+
+  <!-- LAYER 1: APIs -->
+  <div class="section-label"><span>Layer 1 &mdash; Free Data Sources</span></div>
+
+  <div class="row">
+    <div class="card api">
+      <div class="icon">🦎</div>
+      <div class="title">CoinGecko</div>
+      <div class="sub">Price, market cap<br>gold ratio, volume</div>
+    </div>
+    <div class="card api">
+      <div class="icon">⛓️</div>
+      <div class="title">Blockchain.com</div>
+      <div class="sub">Hash rate<br>difficulty</div>
+    </div>
+    <div class="card api">
+      <div class="icon">🔮</div>
+      <div class="title">mempool.space</div>
+      <div class="sub">Difficulty adjustment<br>hashrate history</div>
+    </div>
+    <div class="card api">
+      <div class="icon">😱</div>
+      <div class="title">Fear & Greed</div>
+      <div class="sub">Sentiment index<br>0-100 scale</div>
+    </div>
+    <div class="card api">
+      <div class="icon">📊</div>
+      <div class="title">CoinMetrics</div>
+      <div class="sub">MVRV ratio<br>on-chain data</div>
+    </div>
+  </div>
+
+  <!-- Fan-in arrows -->
+  <svg class="fan-svg" width="800" height="50" viewBox="0 0 800 50" style="max-width:100%">
+    <defs>
+      <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#58A6FF" stop-opacity="0.6"/>
+        <stop offset="100%" stop-color="#F7931A" stop-opacity="0.8"/>
+      </linearGradient>
+    </defs>
+    <line x1="100" y1="5" x2="400" y2="45" stroke="url(#g1)" stroke-width="2"/>
+    <line x1="240" y1="5" x2="400" y2="45" stroke="url(#g1)" stroke-width="2"/>
+    <line x1="400" y1="5" x2="400" y2="45" stroke="url(#g1)" stroke-width="2"/>
+    <line x1="560" y1="5" x2="400" y2="45" stroke="url(#g1)" stroke-width="2"/>
+    <line x1="700" y1="5" x2="400" y2="45" stroke="url(#g1)" stroke-width="2"/>
+  </svg>
+
+  <!-- LAYER 2: Core -->
+  <div class="section-label"><span>Layer 2 &mdash; Data Collection &amp; Storage</span></div>
+
+  <div class="row narrow">
+    <div class="card core" style="min-width:200px;">
+      <div class="icon">📡</div>
+      <div class="title">API Registry</div>
+      <div class="sub">Concurrent fetching<br>Rate limiting &bull; Retry &bull; Cache</div>
+    </div>
+    <div class="card core" style="min-width:200px;">
+      <div class="icon">🗄️</div>
+      <div class="title">SQLite Database</div>
+      <div class="sub">Snapshots &bull; Price history<br>Alerts &bull; DCA &bull; Goals</div>
+    </div>
+    <div class="card core" style="min-width:200px;">
+      <div class="icon">📸</div>
+      <div class="title">CombinedSnapshot</div>
+      <div class="sub">Price + On-chain + Sentiment<br>+ Valuation in one object</div>
+    </div>
+  </div>
+
+  <!-- Fan-out arrows -->
+  <svg class="fan-svg" width="900" height="60" viewBox="0 0 900 60" style="max-width:100%">
+    <defs>
+      <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#F7931A" stop-opacity="0.7"/>
+        <stop offset="100%" stop-color="#00B894" stop-opacity="0.6"/>
+      </linearGradient>
+    </defs>
+    <line x1="450" y1="5" x2="110" y2="55" stroke="url(#g2)" stroke-width="2"/>
+    <line x1="450" y1="5" x2="300" y2="55" stroke="url(#g2)" stroke-width="2"/>
+    <line x1="450" y1="5" x2="450" y2="55" stroke="url(#g2)" stroke-width="2"/>
+    <line x1="450" y1="5" x2="600" y2="55" stroke="url(#g2)" stroke-width="2"/>
+    <line x1="450" y1="5" x2="790" y2="55" stroke="url(#g2)" stroke-width="2"/>
+  </svg>
+
+  <!-- LAYER 3: Engines -->
+  <div class="section-label"><span>Layer 3 &mdash; Analysis Engines</span></div>
+
+  <div class="row">
+    <div class="card engine">
+      <div class="icon">🔄</div>
+      <div class="title">Cycle Analyzer</div>
+      <div class="sub">Halving phase<br>8 cycle stages<br>Nadeau signals</div>
+    </div>
+    <div class="card engine">
+      <div class="icon">💰</div>
+      <div class="title">DCA Engine</div>
+      <div class="sub">Simulate buys<br>Cost basis<br>vs Lump sum</div>
+    </div>
+    <div class="card engine">
+      <div class="icon">🎯</div>
+      <div class="title">Goal Tracker</div>
+      <div class="sub">BTC milestones<br>Projections<br>Bear/flat/bull</div>
+    </div>
+    <div class="card engine">
+      <div class="icon">🚨</div>
+      <div class="title alert-card">Alert Engine</div>
+      <div class="sub">13 rules<br>5 composites<br>Cooldowns</div>
+    </div>
+    <div class="card engine">
+      <div class="icon">🗣️</div>
+      <div class="title">Plain English</div>
+      <div class="sub">Traffic light<br>Couple mode<br>Education</div>
+    </div>
+  </div>
+
+  <!-- Fan-out arrows -->
+  <svg class="fan-svg" width="900" height="60" viewBox="0 0 900 60" style="max-width:100%">
+    <defs>
+      <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#00B894" stop-opacity="0.6"/>
+        <stop offset="100%" stop-color="#A78BFA" stop-opacity="0.6"/>
+      </linearGradient>
+    </defs>
+    <line x1="450" y1="5" x2="90" y2="55" stroke="url(#g3)" stroke-width="2"/>
+    <line x1="450" y1="5" x2="260" y2="55" stroke="url(#g3)" stroke-width="2"/>
+    <line x1="450" y1="5" x2="450" y2="55" stroke="url(#g3)" stroke-width="2"/>
+    <line x1="450" y1="5" x2="640" y2="55" stroke="url(#g3)" stroke-width="2"/>
+    <line x1="450" y1="5" x2="810" y2="55" stroke="url(#g3)" stroke-width="2"/>
+  </svg>
+
+  <!-- LAYER 4: Outputs -->
+  <div class="section-label"><span>Layer 4 &mdash; What You See</span></div>
+
+  <div class="row">
+    <div class="card output">
+      <div class="icon">🖥️</div>
+      <div class="title">Terminal Dashboard</div>
+      <div class="sub">9 live panels<br>Auto-refresh<br><code>main.py dashboard</code></div>
+    </div>
+    <div class="card output">
+      <div class="icon">📈</div>
+      <div class="title">9 Charts (PNG)</div>
+      <div class="sub">Scenario fan<br>Cycle overlay<br>Goal timeline &bull; more</div>
+    </div>
+    <div class="card output">
+      <div class="icon">📄</div>
+      <div class="title">HTML Reports</div>
+      <div class="sub">Full report<br>Couples report<br>Self-contained</div>
+    </div>
+    <div class="card output">
+      <div class="icon">💌</div>
+      <div class="title">Weekly Digest</div>
+      <div class="sub">Auto-summary<br>Terminal + HTML<br>What changed</div>
+    </div>
+    <div class="card alert-card">
+      <div class="icon">🔔</div>
+      <div class="title">Alerts</div>
+      <div class="sub">Console &bull; File<br>Desktop notifications<br>Smart alerts</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Nadeau Framework callout -->
+<div style="max-width:800px; margin:40px auto; padding:0 20px;">
+  <div class="card highlight" style="padding:24px 30px; text-align:left;">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
+      <div style="font-size:2rem;">🧭</div>
+      <div>
+        <div class="title" style="font-size:1.1rem;">Nadeau Framework (The Brain)</div>
+        <div class="sub">Michael Nadeau's cycle analysis — the signal behind the traffic light</div>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-top:10px;">
+      <div style="background:#ffffff08; border-radius:10px; padding:12px 16px;">
+        <div style="color:#00B894; font-weight:600; font-size:0.85rem;">6 Proxy Signals</div>
+        <div style="font-size:0.78rem; color:#8B949E; margin-top:4px;">
+          MVRV Ratio &bull; Fear &amp; Greed &bull; Drawdown from ATH &bull; Hash Rate &bull; BTC/Gold &bull; Dominance
+        </div>
+      </div>
+      <div style="background:#ffffff08; border-radius:10px; padding:12px 16px;">
+        <div style="color:#F7931A; font-weight:600; font-size:0.85rem;">5 Composite Signals</div>
+        <div style="font-size:0.78rem; color:#8B949E; margin-top:4px;">
+          Capitulation Zone &bull; Accumulation &bull; Cycle Bottom &bull; Overheated &bull; Distribution
+        </div>
+      </div>
+      <div style="background:#ffffff08; border-radius:10px; padding:12px 16px;">
+        <div style="color:#FFD93D; font-weight:600; font-size:0.85rem;">Traffic Light Output</div>
+        <div style="font-size:0.78rem; color:#8B949E; margin-top:4px;">
+          <span style="color:#00B894;">GREEN</span> = Accumulate &bull;
+          <span style="color:#FFD93D;">YELLOW</span> = Mixed &bull;
+          <span style="color:#FF6B6B;">RED</span> = Overheated
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Data flow trace -->
+<div style="max-width:800px; margin:30px auto; padding:0 20px;">
+  <div style="background:#161B22; border-radius:14px; border:1px solid #21262D; padding:24px 30px;">
+    <h3 style="font-size:0.85rem; text-transform:uppercase; letter-spacing:2px; color:#8B949E; margin-bottom:16px;">
+      Example: What happens when you run <code style="color:#F7931A;">python main.py simple --for-two</code>
+    </h3>
+    <div style="font-family:monospace; font-size:0.82rem; line-height:2;">
+      <span style="color:#58A6FF;">CoinGecko</span> + <span style="color:#58A6FF;">Blockchain</span> + <span style="color:#58A6FF;">F&amp;G</span> + <span style="color:#58A6FF;">CoinMetrics</span><br>
+      &nbsp;&nbsp;<span style="color:#F7931A;">&darr;</span> concurrent fetch via API Registry<br>
+      <span style="color:#F7931A;">CombinedSnapshot</span> (price + metrics + sentiment + valuation)<br>
+      &nbsp;&nbsp;<span style="color:#F7931A;">&darr;</span> stored in SQLite<br>
+      <span style="color:#00B894;">CycleAnalyzer</span> &rarr; Nadeau signals (6 proxies &rarr; composite bias)<br>
+      &nbsp;&nbsp;<span style="color:#F7931A;">&darr;</span><br>
+      <span style="color:#00B894;">Plain English</span> &rarr; translate each metric to human language<br>
+      &nbsp;&nbsp;<span style="color:#F7931A;">&darr;</span><br>
+      <span style="color:#FFD93D;">Traffic Light</span>: <span style="color:#00B894;">GREEN</span> / <span style="color:#FFD93D;">YELLOW</span> / <span style="color:#FF6B6B;">RED</span><br>
+      &nbsp;&nbsp;<span style="color:#F7931A;">&darr;</span> <code>--for-two</code> flag<br>
+      <span style="color:#A78BFA;">Couple Framing</span> &rarr; "Here's what you both should know this week..."
+    </div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <h3>Layer Colors</h3>
+  <div class="legend-grid">
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#58A6FF;"></div>
+      <span>Data Sources (free APIs)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#F7931A;"></div>
+      <span>Core Infrastructure (fetch, store, snapshot)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#00B894;"></div>
+      <span>Analysis Engines (cycle, DCA, goals, alerts)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#A78BFA;"></div>
+      <span>Outputs (dashboard, charts, reports)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#FF6B6B;"></div>
+      <span>Alerts (console, file, desktop push)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#FFD93D;"></div>
+      <span>Nadeau Framework (the decision brain)</span>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Bitcoin Cycle Monitor v1.0.0 &mdash; 100% free APIs, zero cost, all signal
+</div>
+
+</body>
+</html>
