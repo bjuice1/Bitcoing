@@ -213,6 +213,58 @@ class Database:
         ).fetchone()
         return dict(row) if row else {"min_date": None, "max_date": None}
 
+    def get_price_history_stats(self):
+        """Get price history availability statistics for conditional UI rendering."""
+        try:
+            row = self.conn.execute("""
+                SELECT
+                    COUNT(DISTINCT date) as total_days,
+                    MIN(date) as earliest_date,
+                    MAX(date) as latest_date
+                FROM price_history
+            """).fetchone()
+
+            if not row or row["total_days"] == 0:
+                return {
+                    "total_days": 0,
+                    "earliest_date": None,
+                    "latest_date": None,
+                    "has_sufficient_data": False
+                }
+
+            return {
+                "total_days": row["total_days"],
+                "earliest_date": row["earliest_date"],
+                "latest_date": row["latest_date"],
+                "has_sufficient_data": row["total_days"] >= 365
+            }
+        except sqlite3.OperationalError:
+            # Table doesn't exist yet
+            return {
+                "total_days": 0,
+                "earliest_date": None,
+                "latest_date": None,
+                "has_sufficient_data": False
+            }
+
+    def has_data_for_range(self, start_date, end_date):
+        """Check if we have price data for a specific date range."""
+        try:
+            row = self.conn.execute("""
+                SELECT COUNT(*) as cnt FROM price_history
+                WHERE date >= ? AND date <= ?
+            """, (str(start_date), str(end_date))).fetchone()
+
+            # Consider "has data" if we have at least some coverage (50% of expected days)
+            from datetime import datetime
+            start = datetime.fromisoformat(str(start_date))
+            end = datetime.fromisoformat(str(end_date))
+            expected_days = (end - start).days
+
+            return row["cnt"] >= (expected_days * 0.5)
+        except (sqlite3.OperationalError, ValueError):
+            return False
+
     # --- Alert History ---
 
     def save_alert(self, record):

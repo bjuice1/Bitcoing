@@ -426,6 +426,32 @@ def create_app(config: dict, engines: dict) -> Flask:
         alerts = db.get_recent_alerts(limit=limit)
         return jsonify({"alerts": alerts or [], "count": len(alerts or [])})
 
+    @app.route("/api/data-availability")
+    def api_data_availability():
+        """Check if sufficient historical data exists for DCA simulator."""
+        db = engines["db"]
+        stats = db.get_price_history_stats()
+
+        # Check each preset's data availability
+        preset_availability = {}
+        presets = {
+            "2018-bear": ("2018-01-01", "2019-12-31"),
+            "2021-ath": ("2021-11-01", "2026-02-09"),
+            "2022-crash": ("2022-06-01", "2026-02-09"),
+            "last-halving": ("2024-04-20", "2026-02-09"),
+        }
+
+        for preset_name, (start, end) in presets.items():
+            preset_availability[preset_name] = db.has_data_for_range(start, end)
+
+        return jsonify({
+            "has_sufficient_data": stats["has_sufficient_data"],
+            "total_days": stats["total_days"],
+            "earliest_date": stats["earliest_date"],
+            "latest_date": stats["latest_date"],
+            "preset_availability": preset_availability
+        })
+
     @app.route("/api/backtest")
     def api_backtest():
         """Run DCA backtest simulation."""

@@ -72,34 +72,61 @@
     </section>
 
     <!-- DCA Historical Backtest Simulator -->
-    <section class="card simulator-card">
-        <h3>🔬 DCA Simulator</h3>
-        <p class="card-subtitle">What if you'd started buying Bitcoin at a specific date? Test historical DCA strategies using real price data.</p>
-
-        <div class="preset-buttons">
-            <button class="preset-btn" onclick="runPreset('2018-bear')">2018 Bear Market</button>
-            <button class="preset-btn" onclick="runPreset('2021-ath')">2021 ATH (Worst Case)</button>
-            <button class="preset-btn" onclick="runPreset('2022-crash')">2022 Crash</button>
-            <button class="preset-btn" onclick="runPreset('last-halving')">Last Halving (2024)</button>
+    <section class="card simulator-card" id="simulator-container">
+        <!-- Loading state -->
+        <div id="simulator-loading" style="text-align: center; padding: 2rem;">
+            <p style="color: #666;">Checking data availability...</p>
         </div>
 
-        <div class="custom-controls">
-            <h4>Or customize your scenario:</h4>
-            <div class="input-row">
-                <label>Start Date: <input type="date" id="sim-start" value="2023-01-01" max="2026-02-09"></label>
-                <label>End Date: <input type="date" id="sim-end" value="2026-02-09" max="2026-02-09"></label>
+        <!-- Main simulator content (shown when sufficient data) -->
+        <div id="simulator-content" style="display: none;">
+            <h3>🔬 DCA Simulator</h3>
+            <p class="card-subtitle">What if you'd started buying Bitcoin at a specific date? Test historical DCA strategies using real price data.</p>
+
+            <div class="preset-buttons">
+                <button class="preset-btn" id="preset-2018-bear" onclick="runPreset('2018-bear')">2018 Bear Market</button>
+                <button class="preset-btn" id="preset-2021-ath" onclick="runPreset('2021-ath')">2021 ATH (Worst Case)</button>
+                <button class="preset-btn" id="preset-2022-crash" onclick="runPreset('2022-crash')">2022 Crash</button>
+                <button class="preset-btn" id="preset-last-halving" onclick="runPreset('last-halving')">Last Halving (2024)</button>
             </div>
-            <div class="input-row">
-                <label>Amount: $<input type="number" id="sim-amount" value="200" min="10" max="10000"></label>
-                <label>Frequency:
-                    <select id="sim-freq">
-                        <option value="weekly">Weekly</option>
-                        <option value="biweekly">Bi-weekly</option>
-                        <option value="monthly" selected>Monthly</option>
-                    </select>
-                </label>
+
+            <div class="custom-controls">
+                <h4>Or customize your scenario:</h4>
+                <div class="input-row">
+                    <label>Start Date: <input type="date" id="sim-start" value="2023-01-01" max="2026-02-09"></label>
+                    <label>End Date: <input type="date" id="sim-end" value="2026-02-09" max="2026-02-09"></label>
+                </div>
+                <div class="input-row">
+                    <label>Amount: $<input type="number" id="sim-amount" value="200" min="10" max="10000"></label>
+                    <label>Frequency:
+                        <select id="sim-freq">
+                            <option value="weekly">Weekly</option>
+                            <option value="biweekly">Bi-weekly</option>
+                            <option value="monthly" selected>Monthly</option>
+                        </select>
+                    </label>
+                </div>
+                <button class="btn-primary" onclick="runCustomBacktest()">Run Simulation</button>
             </div>
-            <button class="btn-primary" onclick="runCustomBacktest()">Run Simulation</button>
+        </div>
+
+        <!-- Disabled state (shown when insufficient data) -->
+        <div id="simulator-disabled" style="display: none;">
+            <h3>🔬 DCA Simulator</h3>
+            <p class="card-subtitle">Historical Bitcoin DCA backtesting tool</p>
+
+            <div class="simulator-warning">
+                <p class="warning-icon">⚠️</p>
+                <h4>Historical Data Required</h4>
+                <p>The DCA Simulator requires at least 365 days of historical price data to function.</p>
+                <p><strong>Current data:</strong> <span id="data-days-count">0</span> days available</p>
+
+                <div class="enable-instructions">
+                    <p><strong>To enable this feature:</strong></p>
+                    <pre>railway run python main.py backfill --years 3</pre>
+                    <p class="instruction-note">This will populate the database with historical Bitcoin price data from the past 3 years.</p>
+                </div>
+            </div>
         </div>
 
         <div id="sim-results" class="sim-results" style="display: none;">
@@ -260,6 +287,66 @@
         refreshCharts();
     }
 
+    // DCA Simulator - Data Availability Check
+    let dataAvailability = null;
+
+    async function loadDataAvailability() {
+        try {
+            const response = await fetch('/api/data-availability');
+            if (!response.ok) {
+                showSimulatorDisabled(0);
+                return;
+            }
+
+            dataAvailability = await response.json();
+
+            if (dataAvailability.has_sufficient_data) {
+                showSimulatorEnabled();
+                configurePresetButtons();
+            } else {
+                showSimulatorDisabled(dataAvailability.total_days);
+            }
+        } catch (e) {
+            console.error('Failed to load data availability:', e);
+            showSimulatorDisabled(0);
+        }
+    }
+
+    function showSimulatorEnabled() {
+        document.getElementById('simulator-loading').style.display = 'none';
+        document.getElementById('simulator-content').style.display = 'block';
+        document.getElementById('simulator-disabled').style.display = 'none';
+    }
+
+    function showSimulatorDisabled(dayCount) {
+        document.getElementById('simulator-loading').style.display = 'none';
+        document.getElementById('simulator-content').style.display = 'none';
+        document.getElementById('simulator-disabled').style.display = 'block';
+        document.getElementById('data-days-count').textContent = dayCount;
+    }
+
+    function configurePresetButtons() {
+        if (!dataAvailability || !dataAvailability.preset_availability) return;
+
+        const presetMap = {
+            '2018-bear': 'preset-2018-bear',
+            '2021-ath': 'preset-2021-ath',
+            '2022-crash': 'preset-2022-crash',
+            'last-halving': 'preset-last-halving'
+        };
+
+        for (const [presetKey, buttonId] of Object.entries(presetMap)) {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                const isAvailable = dataAvailability.preset_availability[presetKey];
+                button.disabled = !isAvailable;
+                if (!isAvailable) {
+                    button.title = 'Insufficient historical data for this preset';
+                }
+            }
+        }
+    }
+
     // DCA Simulator
     const TODAY = '2026-02-09';  // Current date for presets
     const PRESETS = {
@@ -332,10 +419,14 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        // Load charts
         loadChart('price_levels', 'chart-price-levels');
         loadChart('cycle_overlay', 'chart-cycle-overlay');
         loadChart('scenario_fan', 'chart-scenario-fan');
         loadChart('goal_timeline', 'chart-goal-timeline');
+
+        // Check data availability for DCA simulator
+        loadDataAvailability();
     });
 </script>
 {% endblock %}
