@@ -34,7 +34,7 @@
     </main>
 
     <footer class="app-footer">
-        <p>Bitcoin Cycle Monitor &mdash; Data refreshes every 60s</p>
+        <p>Bitcoin Cycle Monitor &mdash; Data refreshes every 3 minutes</p>
     </footer>
 
     <script>
@@ -78,7 +78,7 @@
             } catch (e) {
                 console.warn('Refresh failed:', e);
             }
-        }, 60000);
+        }, 180000); // 3 minutes (reduced frequency to avoid rate limits)
     </script>
     {% block scripts %}{% endblock %}
 </body>

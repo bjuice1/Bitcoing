@@ -38,7 +38,7 @@ def create_app(config: dict, engines: dict) -> Flask:
 
     # Cache for snapshot data
     _cache = {"snapshot": None, "timestamp": 0}
-    CACHE_TTL = 300  # 5 minutes
+    CACHE_TTL = 900  # 15 minutes (increased to avoid CoinGecko rate limits)
 
     # ─── Template Filters ────────────────────────────────
 

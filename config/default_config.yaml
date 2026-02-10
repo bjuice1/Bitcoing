@@ -1,10 +1,10 @@
 api:
   coingecko:
-    rate_limit: 30  # calls per minute
-    cache_ttl: 300  # seconds
+    rate_limit: 10  # calls per minute (reduced to avoid 429 errors)
+    cache_ttl: 900  # seconds (15 min - increased to reduce API calls)
   blockchain_info:
-    rate_limit: 30
-    cache_ttl: 300
+    rate_limit: 10
+    cache_ttl: 900  # increased to reduce API calls
   mempool:
     rate_limit: 60
     cache_ttl: 120
