@@ -74,7 +74,7 @@
     <!-- DCA Historical Backtest Simulator -->
     <section class="card simulator-card">
         <h3>🔬 DCA Simulator</h3>
-        <p class="card-subtitle">What if you'd started buying Bitcoin at a specific date?</p>
+        <p class="card-subtitle">What if you'd started buying Bitcoin at a specific date? Test historical DCA strategies using real price data.</p>
 
         <div class="preset-buttons">
             <button class="preset-btn" onclick="runPreset('2018-bear')">2018 Bear Market</button>
@@ -86,8 +86,8 @@
         <div class="custom-controls">
             <h4>Or customize your scenario:</h4>
             <div class="input-row">
-                <label>Start Date: <input type="date" id="sim-start" value="2020-01-01"></label>
-                <label>End Date: <input type="date" id="sim-end" value="2024-12-31"></label>
+                <label>Start Date: <input type="date" id="sim-start" value="2023-01-01" max="2026-02-09"></label>
+                <label>End Date: <input type="date" id="sim-end" value="2026-02-09" max="2026-02-09"></label>
             </div>
             <div class="input-row">
                 <label>Amount: $<input type="number" id="sim-amount" value="200" min="10" max="10000"></label>
@@ -261,11 +261,12 @@
     }
 
     // DCA Simulator
+    const TODAY = '2026-02-09';  // Current date for presets
     const PRESETS = {
         '2018-bear': { start: '2018-01-01', end: '2019-12-31', amount: 200, freq: 'monthly' },
-        '2021-ath': { start: '2021-11-01', end: '2026-02-09', amount: 200, freq: 'monthly' },
-        '2022-crash': { start: '2022-06-01', end: '2026-02-09', amount: 200, freq: 'weekly' },
-        'last-halving': { start: '2024-04-20', end: '2026-02-09', amount: 200, freq: 'monthly' },
+        '2021-ath': { start: '2021-11-01', end: TODAY, amount: 200, freq: 'monthly' },
+        '2022-crash': { start: '2022-06-01', end: TODAY, amount: 200, freq: 'weekly' },
+        'last-halving': { start: '2024-04-20', end: TODAY, amount: 200, freq: 'monthly' },
     };
 
     async function runPreset(key) {
@@ -283,11 +284,32 @@
         const amount = document.getElementById('sim-amount').value;
         const freq = document.getElementById('sim-freq').value;
 
+        // Validate dates
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        const today = new Date('2026-02-09');
+
+        if (startDate >= endDate) {
+            alert('Start date must be before end date.');
+            return;
+        }
+
+        if (endDate > today) {
+            alert('End date cannot be in the future. This simulator uses historical price data only.');
+            return;
+        }
+
+        if (startDate < new Date('2013-01-01')) {
+            alert('Start date must be after 2013-01-01 (when reliable Bitcoin price data begins).');
+            return;
+        }
+
         try {
             const url = `/api/backtest?start=${start}&end=${end}&amount=${amount}&frequency=${freq}`;
             const response = await fetch(url);
             if (!response.ok) {
-                alert('Error running simulation. Please check your dates.');
+                const error = await response.json();
+                alert(error.error || 'Error running simulation. Please check your dates and ensure historical data exists.');
                 return;
             }
             const data = await response.json();
